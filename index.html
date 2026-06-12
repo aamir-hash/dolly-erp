@@ -1,0 +1,1507 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1"/>
+<meta name="apple-mobile-web-app-capable" content="yes"/>
+<meta name="apple-mobile-web-app-title" content="Dolly Ops"/>
+<title>Dolly Petroleum — Operations</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;600;700;800&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet"/>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+:root{--blue:#017DC5;--blue-d:#015f96;--blue-l:#e8f4fd;--yellow:#FFDC02;--yellow-d:#e6c600;--green:#0a8f5c;--green-bg:#e6f7f1;--red:#d93025;--red-bg:#fce8e6;--amber:#c97a00;--amber-bg:#fff3e0;--bg:#f2f7fb;--bg2:#fff;--border:#cde0f0;--text:#0a1f30;--text2:#3a6080;--text3:#7a9db8;--mono:'DM Mono',monospace;--font:'DM Sans',sans-serif}
+body{font-family:var(--font);background:var(--bg);color:var(--text);font-size:14px;padding-bottom:68px;min-height:100vh}
+/* TOPBAR */
+.topbar{background:var(--blue);padding:0 16px;height:54px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:200;box-shadow:0 2px 8px rgba(1,80,150,.2)}
+.topbar::after{content:'';position:absolute;bottom:0;left:0;right:0;height:3px;background:var(--yellow)}
+.tb-left{display:flex;align-items:center;gap:10px}
+.tb-logo{width:34px;height:34px;background:var(--yellow);border-radius:8px;display:flex;align-items:center;justify-content:center;font:700 12px/1 var(--mono);color:var(--blue);flex-shrink:0}
+.tb-title{font-size:15px;font-weight:800;color:#fff}
+.tb-sub{font-size:10px;color:rgba(255,255,255,.6);font-family:var(--mono)}
+/* BOTTOM NAV */
+.bnav{position:fixed;bottom:0;left:0;right:0;background:var(--bg2);border-top:1.5px solid var(--border);display:flex;z-index:200;box-shadow:0 -2px 12px rgba(1,125,197,.1)}
+.bn{flex:1;padding:8px 4px 6px;text-align:center;cursor:pointer;border:none;background:none;font-family:var(--font)}
+.bn-icon{font-size:21px;display:block;margin-bottom:1px}
+.bn-label{font-size:9px;font-weight:700;color:var(--text3);letter-spacing:.04em;text-transform:uppercase}
+.bn.active .bn-label{color:var(--blue)}
+/* PAGES */
+.page{display:none;max-width:680px;margin:0 auto;padding:14px}
+.page.active{display:block}
+/* CARD */
+.card{background:var(--bg2);border:1.5px solid var(--border);border-radius:12px;padding:16px;margin-bottom:12px;box-shadow:0 2px 8px rgba(1,125,197,.06)}
+.card-title{font-size:11px;font-weight:700;color:var(--blue);text-transform:uppercase;letter-spacing:.08em;margin-bottom:12px;padding-bottom:9px;border-bottom:2px solid var(--blue-l);display:flex;align-items:center;gap:8px}
+.card-title::before{content:'';display:inline-block;width:3px;height:12px;background:var(--yellow);border-radius:2px}
+.card-sub{font-size:10px;font-weight:700;color:var(--blue);text-transform:uppercase;letter-spacing:.06em;margin:10px 0 8px}
+/* FORM */
+.field{margin-bottom:10px}
+.field label{display:block;font-size:11px;font-weight:700;color:var(--text3);margin-bottom:4px;text-transform:uppercase;letter-spacing:.04em}
+.field input,.field select{width:100%;padding:11px 13px;border:1.5px solid var(--border);border-radius:9px;font-size:15px;font-family:var(--font);color:var(--text);background:var(--bg2);-webkit-appearance:none;transition:border-color .15s}
+.field input:focus,.field select:focus{outline:none;border-color:var(--blue);background:#fff}
+.field input[type=number]{-moz-appearance:textfield;font-family:var(--mono)}
+.field input[type=number]::-webkit-outer-spin-button,.field input[type=number]::-webkit-inner-spin-button{-webkit-appearance:none}
+.field .hint{font-size:11px;color:var(--text3);margin-top:4px;font-family:var(--mono)}
+.field .hint.ok{color:var(--green)}.field .hint.warn{color:var(--red)}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.grid3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px}
+/* NOZZLE BLOCK */
+.nz-block{background:var(--bg);border:1.5px solid var(--border);border-radius:10px;padding:12px;margin-bottom:10px}
+.nz-title{font-size:11px;font-weight:700;color:var(--blue-d);margin-bottom:8px;font-family:var(--mono);text-transform:uppercase}
+.nz-sold{font-size:12px;padding:6px 10px;background:var(--blue-l);border-radius:7px;margin-top:7px;font-family:var(--mono);color:var(--text2)}
+.nz-sold b{color:var(--blue)}
+/* VROW */
+.vrow{display:flex;justify-content:space-between;align-items:center;padding:7px 0;border-bottom:1px solid var(--bg);font-size:12px}
+.vrow:last-child{border-bottom:none}
+.vl{color:var(--text2)}.vv{font-family:var(--mono);font-weight:600}
+.ok{color:var(--green)}.warn{color:var(--red)}.info{color:var(--blue)}.muted{color:var(--text3)}.amber{color:var(--amber)}
+/* BUTTONS */
+.btn{width:100%;padding:13px;border:none;border-radius:10px;font-size:15px;font-weight:700;cursor:pointer;font-family:var(--font);transition:opacity .15s;margin-top:6px}
+.btn:active{opacity:.8}
+.btn-blue{background:var(--blue);color:#fff}
+.btn-green{background:var(--green);color:#fff;font-size:16px;padding:15px}
+.btn-outline{background:var(--bg2);color:var(--blue);border:1.5px solid var(--blue)}
+.btn-red{background:var(--red);color:#fff}
+.btn-wa{background:#25D366;color:#fff;display:flex;align-items:center;justify-content:center;gap:8px}
+.btn-sm{padding:7px 14px;font-size:12px;width:auto;border-radius:8px}
+/* KPI */
+.kpi-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:10px;margin-bottom:14px}
+.kpi-grid-4{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:14px}
+.kpi{background:var(--bg2);border:1.5px solid var(--border);border-radius:10px;padding:12px;text-align:center;border-top:3px solid var(--blue)}
+.kpi.g{border-top-color:var(--green)}.kpi.g .kv{color:var(--green)}
+.kpi.r{border-top-color:var(--red)}.kpi.r .kv{color:var(--red)}
+.kpi.y{border-top-color:var(--yellow-d)}.kpi.y .kv{color:var(--amber)}
+.kv{font-size:16px;font-weight:700;color:var(--blue);font-family:var(--mono);line-height:1.1}
+.kl{font-size:10px;color:var(--text3);margin-top:4px;text-transform:uppercase;letter-spacing:.06em;font-weight:700}
+.ks{font-size:10px;color:var(--text3);margin-top:2px;font-family:var(--mono)}
+/* TABLES */
+.tbl-wrap{overflow-x:auto;border-radius:10px;border:1.5px solid var(--border)}
+table{width:100%;border-collapse:collapse;font-size:11px}
+th{text-align:left;padding:8px 10px;background:var(--blue);color:rgba(255,255,255,.85);font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;border-bottom:2px solid var(--yellow);white-space:nowrap}
+td{padding:7px 10px;border-bottom:1px solid #f0f7fd;vertical-align:middle}
+td.r{text-align:right;font-family:var(--mono)}td.c{text-align:center}
+tr:hover td{background:#f0f7fd}tr:last-child td{border-bottom:none}
+tr.total-row td{background:rgba(1,125,197,.06);font-weight:700;border-top:2px solid var(--border)}
+tr.loss-row td{background:rgba(217,48,37,.03)}
+tr.hi-row td{background:rgba(255,220,2,.06)}
+/* BAR */
+.bar-row{display:flex;align-items:center;gap:8px;margin-bottom:4px}
+.bar-label{width:48px;font-size:10px;color:var(--text3);font-family:var(--mono);flex-shrink:0}
+.bar-track{flex:1;background:var(--blue-l);border-radius:4px;height:20px;overflow:hidden;border:1px solid var(--border)}
+.bar-fill{height:100%;border-radius:4px;display:flex;align-items:center;padding:0 6px;min-width:3px;background:linear-gradient(90deg,#d0eaf9,var(--blue))}
+.bar-fill.ms{background:linear-gradient(90deg,#d5f5e8,var(--green))}
+.bar-fill.amber{background:linear-gradient(90deg,#ffe8b0,var(--amber))}
+.bar-val{font-size:9px;font-weight:600;color:#fff;white-space:nowrap}
+.bar-right{font-size:10px;font-family:var(--mono);color:var(--text2);min-width:80px;text-align:right;flex-shrink:0}
+/* ALERTS */
+.alert{border-radius:10px;padding:11px 13px;margin-bottom:10px;font-size:12px;line-height:1.7}
+.alert-b{background:var(--blue-l);color:var(--blue-d);border:1.5px solid rgba(1,125,197,.2)}
+.alert-g{background:var(--green-bg);color:var(--green);border:1.5px solid rgba(10,143,92,.2)}
+.alert-a{background:var(--amber-bg);color:var(--amber);border:1.5px solid rgba(201,122,0,.2)}
+.alert-r{background:var(--red-bg);color:var(--red);border:1.5px solid rgba(217,48,37,.2)}
+/* HERO */
+.hero{background:linear-gradient(135deg,var(--blue-d),var(--blue));border-radius:12px;padding:18px;margin-bottom:14px;position:relative;overflow:hidden}
+.hero::after{content:'';position:absolute;top:-20px;right:-20px;width:80px;height:80px;background:var(--yellow);border-radius:50%;opacity:.12}
+.hero h2{font-size:17px;font-weight:800;color:#fff;margin-bottom:3px}
+.hero p{font-size:11px;color:rgba(255,255,255,.65);font-family:var(--mono)}
+/* PROFIT BOX */
+.pbox{background:linear-gradient(135deg,#0a3d1f,#0d5c2e);border-radius:10px;padding:15px;margin-bottom:12px}
+.pb-title{font-size:10px;font-weight:700;color:rgba(255,255,255,.5);text-transform:uppercase;letter-spacing:.1em;margin-bottom:10px}
+.prow{display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px solid rgba(255,255,255,.07);font-size:12px}
+.prow:last-child{border-bottom:none;margin-top:5px;padding-top:8px;border-top:1px solid rgba(255,255,255,.2)}
+.pl{color:rgba(255,255,255,.65)}.pv{font-family:var(--mono);font-weight:700;color:#4ade80}
+.pv.exp{color:#f87171}.pv.big{font-size:17px}.pv.amber{color:#fbbf24}
+/* DIVIDER */
+.divider{height:1px;background:var(--border);margin:12px 0}
+/* TOAST */
+.toast{position:fixed;bottom:76px;left:50%;transform:translateX(-50%);background:var(--blue-d);color:#fff;padding:10px 22px;border-radius:24px;font-size:13px;font-weight:700;z-index:999;box-shadow:0 4px 14px rgba(0,0,0,.2);pointer-events:none;white-space:nowrap}
+/* STEP NAV */
+.step-bar{display:flex;gap:4px;margin-bottom:14px}
+.step-dot{flex:1;height:4px;border-radius:2px;background:var(--border);transition:background .2s}
+.step-dot.done{background:var(--green)}.step-dot.active{background:var(--blue)}
+/* BADGE */
+.badge{display:inline-block;padding:2px 7px;border-radius:10px;font-size:9px;font-weight:700;font-family:var(--mono)}
+.bb{background:var(--blue-l);color:var(--blue);border:1px solid rgba(1,125,197,.2)}
+.bg{background:var(--green-bg);color:var(--green);border:1px solid rgba(10,143,92,.2)}
+.ba{background:var(--amber-bg);color:var(--amber);border:1px solid rgba(201,122,0,.2)}
+.br{background:var(--red-bg);color:var(--red);border:1px solid rgba(217,48,37,.2)}
+/* EXPENSE LIST */
+.exp-item{display:flex;align-items:center;gap:8px;padding:8px 0;border-bottom:1px solid var(--bg)}
+.exp-item:last-child{border-bottom:none}
+.exp-name{flex:1;font-size:13px;color:var(--text)}
+.exp-amt{font-family:var(--mono);font-weight:600;color:var(--red);font-size:13px;flex-shrink:0}
+.exp-del{background:none;border:none;color:var(--text3);cursor:pointer;font-size:16px;padding:2px 6px;flex-shrink:0}
+/* HIDDEN */
+.hidden{display:none!important}
+/* REPORT TABS */
+.rtabs{display:flex;gap:6px;margin-bottom:14px;overflow-x:auto;scrollbar-width:none}
+.rtabs::-webkit-scrollbar{display:none}
+.rtab{flex-shrink:0;padding:7px 14px;border-radius:20px;border:1.5px solid var(--border);background:var(--bg2);font-size:12px;font-weight:700;color:var(--text3);cursor:pointer;font-family:var(--font);white-space:nowrap}
+.rtab.active{background:var(--blue);color:#fff;border-color:var(--blue)}
+/* STATUS */
+.status-ok{color:var(--green);font-weight:700}
+.status-short{color:var(--red);font-weight:700}
+/* CALENDAR/HISTORY */
+.hist-item{display:flex;align-items:center;gap:12px;padding:12px;border-bottom:1px solid var(--bg);cursor:pointer}
+.hist-item:last-child{border-bottom:none}
+.hist-item:active{background:var(--blue-l)}
+.hist-date{flex-shrink:0;width:44px;text-align:center}
+.hist-d{font-size:18px;font-weight:800;color:var(--blue);line-height:1}
+.hist-m{font-size:10px;color:var(--text3);font-family:var(--mono)}
+.hist-info{flex:1}
+.hist-rev{font-size:14px;font-weight:700;color:var(--text)}
+.hist-vol{font-size:11px;color:var(--text3);font-family:var(--mono);margin-top:2px}
+.hist-profit{font-family:var(--mono);font-weight:600;font-size:13px;flex-shrink:0}
+.hist-arrow{color:var(--text3);font-size:16px}
+/* SETTINGS */
+.setting-row{display:flex;align-items:center;justify-content:space-between;padding:12px 0;border-bottom:1px solid var(--bg)}
+.setting-row:last-child{border-bottom:none}
+.setting-label{font-size:13px;font-weight:600;color:var(--text)}
+.setting-sub{font-size:11px;color:var(--text3);margin-top:2px}
+.setting-val{font-family:var(--mono);font-size:13px;font-weight:600;color:var(--blue);cursor:pointer;text-decoration:underline dotted}
+/* MODAL */
+.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:500;display:flex;align-items:flex-end}
+.modal{background:var(--bg2);border-radius:16px 16px 0 0;padding:20px;width:100%;max-height:85vh;overflow-y:auto}
+.modal-title{font-size:15px;font-weight:800;color:var(--text);margin-bottom:14px}
+@media(min-width:600px){.kpi-grid{grid-template-columns:repeat(4,1fr)}.kpi-grid-4{grid-template-columns:repeat(4,1fr)}}
+@media print{.topbar,.bnav,.btn,.rtabs{display:none!important}.page{display:block!important}body{background:#fff}}
+/* LOGIN */
+.login-overlay{position:fixed;inset:0;background:linear-gradient(150deg,#013a5e 0%,var(--blue) 60%,#017DC5 100%);z-index:1000;display:flex;align-items:center;justify-content:center;padding:20px}
+.login-card{background:#fff;border-radius:20px;padding:32px 24px;width:100%;max-width:380px;box-shadow:0 24px 80px rgba(0,0,0,.35)}
+.login-logo{width:60px;height:60px;background:var(--yellow);border-radius:14px;display:flex;align-items:center;justify-content:center;font:800 20px/1 var(--mono);color:var(--blue);margin:0 auto 16px;box-shadow:0 4px 12px rgba(255,220,2,.4)}
+.login-title{font-size:22px;font-weight:800;color:var(--text);text-align:center;margin-bottom:2px}
+.login-sub{font-size:12px;color:var(--text3);text-align:center;margin-bottom:24px;font-family:var(--mono)}
+.login-err{background:var(--red-bg);color:var(--red);border:1.5px solid rgba(217,48,37,.2);border-radius:9px;padding:10px 13px;font-size:12px;margin-bottom:12px;display:none}
+.tb-user{display:flex;flex-direction:column;align-items:flex-end}
+.tb-uname{font-size:11px;font-weight:700;color:#fff}
+.tb-urole{font-size:9px;color:rgba(255,255,255,.6);text-transform:uppercase;letter-spacing:.06em}
+.um-row{display:flex;align-items:center;gap:8px;padding:10px 0;border-bottom:1px solid var(--bg)}
+.um-row:last-child{border-bottom:none}
+.um-info{flex:1}
+.um-name{font-size:13px;font-weight:600;color:var(--text)}
+.um-role{font-size:10px;color:var(--text3)}
+</style>
+<script src="https://cdn.jsdelivr.net/npm/@azure/msal-browser@3/lib/msal-browser.min.js"></script>
+</head>
+<body>
+
+<!-- LOGIN OVERLAY -->
+<div class="login-overlay" id="loginOverlay">
+  <div class="login-card">
+    <div class="login-logo">DP</div>
+    <div class="login-title">Dolly Petroleum</div>
+    <div class="login-sub">Operations App · Sign in to continue</div>
+    <div class="login-err" id="loginErr">❌ Sign-in failed — try again</div>
+    <p style="font-size:13px;color:var(--text2);text-align:center;margin-bottom:18px">Sign in with your company Microsoft account to continue.</p>
+    <button class="btn btn-blue" onclick="doLogin()" style="margin-top:4px;font-size:16px">Sign in with Microsoft →</button>
+  </div>
+</div>
+
+<div class="topbar">
+  <div class="tb-left">
+    <div class="tb-logo">DP</div>
+    <div><div class="tb-title">Dolly Petroleum</div><div class="tb-sub" id="topSub">Operations App</div></div>
+  </div>
+  <div style="display:flex;align-items:center;gap:8px">
+    <div id="syncStatus" style="font-size:9px;color:rgba(255,255,255,.65);font-family:var(--mono);text-align:right;line-height:1.4;cursor:pointer" onclick="spSync.pull()" title="Tap to refresh"></div>
+    <div class="tb-user" id="tbUser"></div>
+    <button onclick="doLogout()" title="Sign out" style="background:rgba(255,255,255,.15);color:#fff;border:none;padding:6px 10px;border-radius:7px;font-weight:700;cursor:pointer;font-size:13px;font-family:var(--font)">↩</button>
+    <button onclick="window.print()" style="background:var(--yellow);color:var(--blue);border:none;padding:6px 12px;border-radius:7px;font-weight:700;cursor:pointer;font-size:11px;font-family:var(--font)">🖨</button>
+  </div>
+</div>
+
+<div class="bnav">
+  <button class="bn active" onclick="nav(0)" id="bn0"><span class="bn-icon">✏️</span><span class="bn-label">Entry</span></button>
+  <button class="bn" onclick="nav(1)" id="bn1"><span class="bn-icon">📋</span><span class="bn-label">Today</span></button>
+  <button class="bn" onclick="nav(2)" id="bn2"><span class="bn-icon">📊</span><span class="bn-label">Reports</span></button>
+  <button class="bn" onclick="nav(3)" id="bn3"><span class="bn-icon">🤝</span><span class="bn-label">Parties</span></button>
+  <button class="bn" onclick="nav(4)" id="bn4"><span class="bn-icon">🕐</span><span class="bn-label">History</span></button>
+  <button class="bn" onclick="nav(5)" id="bn5"><span class="bn-icon">⚙️</span><span class="bn-label">Settings</span></button>
+</div>
+
+<!-- ═══════════════════════════════════════════ PAGE 0: ENTRY ═══ -->
+<div class="page active" id="page0">
+  <div class="step-bar" id="stepBar"></div>
+  <div id="entryContent"></div>
+</div>
+
+<!-- ═══════════════════════════════════════════ PAGE 1: TODAY ════ -->
+<div class="page" id="page1">
+  <div id="todayContent">
+    <div class="card" style="text-align:center;padding:40px 16px">
+      <div style="font-size:44px;margin-bottom:12px">📋</div>
+      <p style="font-size:15px;font-weight:700;color:var(--text)">No entry today yet</p>
+      <p style="font-size:12px;color:var(--text3);margin-top:8px">Fill the Entry tab to see today's summary.</p>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════ PAGE 2: REPORTS ══ -->
+<div class="page" id="page2">
+  <div class="rtabs">
+    <button class="rtab active" onclick="rTab(0,this)">Daily</button>
+    <button class="rtab" onclick="rTab(1,this)">Weekly</button>
+    <button class="rtab" onclick="rTab(2,this)">Monthly</button>
+    <button class="rtab" onclick="rTab(3,this)">All-time</button>
+  </div>
+  <div id="reportContent"></div>
+</div>
+
+
+<!-- ═══════════════════════════════════════════ PAGE 3: PARTIES ══ -->
+<div class="page" id="page3">
+  <div class="hero"><h2>Credit Parties</h2><p>Outstanding balances · per-party ledger</p></div>
+  <div id="partySummaryCards"></div>
+  <div id="partyListCards"></div>
+</div>
+
+<!-- ═══════════════════════════════════════════ PAGE 4: HISTORY ══ -->
+<div class="page" id="page4">
+  <div class="card">
+    <div class="card-title">📅 All Entries</div>
+    <div id="histList"></div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════ PAGE 4: SETTINGS ═ -->
+<div class="page" id="page5">
+  <div class="hero"><h2>Settings</h2><p>Rates · Nozzle baseline · Backup</p></div>
+  <div class="card">
+    <div class="card-title">📋 Current Rates</div>
+    <div class="grid2">
+      <div class="field"><label>MS Sell ₹/L</label><input type="number" id="s-pSell" step="0.01" oninput="saveSettings()"/></div>
+      <div class="field"><label>MS Buy ₹/L</label><input type="number" id="s-pBuy" step="0.01" oninput="saveSettings()"/></div>
+      <div class="field"><label>HSD Sell ₹/L</label><input type="number" id="s-dSell" step="0.01" oninput="saveSettings()"/></div>
+      <div class="field"><label>HSD Buy ₹/L</label><input type="number" id="s-dBuy" step="0.01" oninput="saveSettings()"/></div>
+    </div>
+    <p style="font-size:11px;color:var(--text3);margin-top:4px">Update when BPCL revises prices. New rate applies from next entry.</p>
+  </div>
+  <div class="card">
+    <div class="card-title">⚠️ Shortfall Alarm</div>
+    <div class="field"><label>Alert threshold (litres)</label><input type="number" id="s-sfThresh" step="10" value="100" oninput="SHORTFALL_THRESHOLD=parseFloat(this.value)||100"/></div>
+    <p style="font-size:11px;color:var(--text3);margin-top:4px">Show alarm when Dip reading is below Automation by more than this amount.</p>
+  </div>
+  <div class="card">
+    <div class="card-title">🔢 Nozzle Baseline</div>
+    <p style="font-size:12px;color:var(--text2);margin-bottom:12px">Opening meter readings before first entry. Only change if resetting the system.</p>
+    <div class="grid2">
+      <div class="field"><label>P1 (MS)</label><input type="number" id="s-p1" step="0.01" oninput="saveSettings()"/></div>
+      <div class="field"><label>P2 (MS)</label><input type="number" id="s-p2" step="0.01" oninput="saveSettings()"/></div>
+      <div class="field"><label>P3 (MS)</label><input type="number" id="s-p3" step="0.01" oninput="saveSettings()"/></div>
+      <div class="field"><label>P4 (MS)</label><input type="number" id="s-p4" step="0.01" oninput="saveSettings()"/></div>
+      <div class="field"><label>D1 (HSD)</label><input type="number" id="s-d1" step="0.01" oninput="saveSettings()"/></div>
+      <div class="field"><label>D2 (HSD)</label><input type="number" id="s-d2" step="0.01" oninput="saveSettings()"/></div>
+      <div class="field"><label>D3 (HSD)</label><input type="number" id="s-d3" step="0.01" oninput="saveSettings()"/></div>
+      <div class="field"><label>D4 (HSD)</label><input type="number" id="s-d4" step="0.01" oninput="saveSettings()"/></div>
+    </div>
+  </div>
+  <div class="card">
+    <div class="card-title">💾 Backup & Restore</div>
+    <p style="font-size:12px;color:var(--text2);margin-bottom:12px">Export all data as JSON to back up or transfer to another device.</p>
+    <button class="btn btn-blue" onclick="exportBackup()">⬇ Export All Data (JSON)</button>
+    <button class="btn btn-outline" style="margin-top:8px" onclick="document.getElementById('importFile').click()">⬆ Import from Backup</button>
+    <input type="file" id="importFile" accept=".json" style="display:none" onchange="importBackup(this)"/>
+    <button class="btn btn-red" style="margin-top:16px;opacity:.7" onclick="clearAll()">🗑 Clear All Data</button>
+  </div>
+  <div class="card" id="spSyncCard">
+    <div class="card-title">☁ Cloud Sync</div>
+    <div id="spSyncStatus" class="alert alert-b" style="margin-bottom:10px;font-size:12px">Checking sync status…</div>
+    <p style="font-size:11px;color:var(--text3);margin-top:4px">Data is stored in <strong>dolly_ops_data.json</strong> on the company SharePoint (sites/dolly · Operations/Reporting). Nothing is stored outside SharePoint.</p>
+    <div style="display:flex;gap:8px;margin-top:8px">
+      <button class="btn btn-outline btn-sm" style="width:auto;padding:10px 18px" onclick="spSync.pull().then(renderSettings)">⟳ Pull Now</button>
+      <button class="btn btn-outline btn-sm" style="width:auto;padding:10px 18px" onclick="spSync.push().then(renderSettings)">↑ Push Now</button>
+    </div>
+  </div>
+  <div class="card" id="userMgmtCard">
+    <div class="card-title">👥 User Management</div>
+    <p style="font-size:12px;color:var(--text2);margin-bottom:12px">Assign roles by Microsoft account email. Admins see all tabs including Settings; everyone else is Staff. Add yourself as admin first.</p>
+    <div id="userList"></div>
+    <div class="divider"></div>
+    <div class="card-sub">+ Add New User</div>
+    <div class="grid2">
+      <div class="field"><label>Microsoft Email</label><input type="text" id="nu-user" placeholder="e.g. shiban@company.com" autocapitalize="none"/></div>
+      <div class="field"><label>Display Name</label><input type="text" id="nu-name" placeholder="e.g. Shiban"/></div>
+      <div class="field"><label>Role</label><select id="nu-role"><option value="staff">Staff</option><option value="admin">Admin</option></select></div>
+    </div>
+    <button class="btn btn-blue" onclick="addUser()">+ Add User</button>
+  </div>
+  <div class="card">
+    <div class="card-title">ℹ️ About</div>
+    <div class="vrow"><span class="vl">Station</span><span class="vv">Dolly Petroleum, Chandrapur</span></div>
+    <div class="vrow"><span class="vl">Signed in as</span><span class="vv info" id="s-loggedIn">—</span></div>
+    <div class="vrow"><span class="vl">Total entries</span><span class="vv info" id="s-count">—</span></div>
+    <div class="vrow"><span class="vl">Last entry</span><span class="vv" id="s-last">—</span></div>
+    <div class="vrow"><span class="vl">Version</span><span class="vv muted">2.0 · Jun 2026</span></div>
+  </div>
+</div>
+
+<!-- DETAIL MODAL -->
+<div class="modal-overlay hidden" id="detailModal" onclick="closeModal(event)">
+  <div class="modal" id="detailContent"></div>
+</div>
+
+<script>
+// ═══════════════════════════════════════ DATA LAYER ══════════════
+var SK = 'dp_ops_v3', SS = 'dp_settings_v2';
+
+var DEF_SETTINGS = {
+  rates: {pSell:111.74, pBuy:107.65, pCost:107.65, dSell:98.45, dBuy:95.86, dCost:95.86},
+  baseline: {p1:58329.09,p2:543.03,p3:385938.94,p4:1580868.60,
+             d1:1369310.85,d2:1019966.13,d3:96899.56,d4:17115.81}
+};
+
+var settings = JSON.parse(JSON.stringify(DEF_SETTINGS));
+var entries = []; // array of day records, sorted by date
+
+function loadData(){
+  try{ var s=localStorage.getItem(SS); if(s) settings=JSON.parse(s); }catch(e){}
+  try{ var e=localStorage.getItem(SK); if(e) entries=JSON.parse(e); }catch(e){}
+}
+function saveEntries(){
+  try{ localStorage.setItem(SK,JSON.stringify(entries)); }catch(e){ alert('Storage full. Export backup first.'); }
+  if(typeof spSync!=='undefined'&&spSync.active) spSync.schedulePush();
+}
+function saveSettings(){ 
+  settings.rates.pSell=parseFloat(document.getElementById('s-pSell').value)||settings.rates.pSell;
+  settings.rates.pBuy=parseFloat(document.getElementById('s-pBuy').value)||settings.rates.pBuy;
+  settings.rates.dSell=parseFloat(document.getElementById('s-dSell').value)||settings.rates.dSell;
+  settings.rates.dBuy=parseFloat(document.getElementById('s-dBuy').value)||settings.rates.dBuy;
+  ['p1','p2','p3','p4','d1','d2','d3','d4'].forEach(function(k){
+    var v=parseFloat(document.getElementById('s-'+k).value); if(!isNaN(v)) settings.baseline[k]=v;
+  });
+  try{ localStorage.setItem(SS,JSON.stringify(settings)); }catch(e){}
+  if(typeof spSync!=='undefined'&&spSync.active) spSync.schedulePush();
+}
+
+// ── Historic data now lives in dolly_ops_data.json on SharePoint ──
+function seedHistoric(){}
+
+// ═══════════════════════════════════════ COMPUTE ENGINE ══════════
+function getPrev(date){
+  var sorted = entries.filter(function(e){ return e.date < date && e.submitted; });
+  return sorted.length ? sorted[sorted.length-1] : null;
+}
+function getBaseline(){ return settings.baseline; }
+function nozzleTotal(e,keys){ if(!e) return 0; return keys.reduce(function(s,k){ return s+(e[k]||0); },0); }
+
+function computeEntry(e){
+  if(e.type==='import'){ 
+    e.totalColl=(e.cash||0)+(e.upi||0)+(e.swipe||0)+(e.fleet||0);
+    e.totalExp=(e.expenses||[]).reduce(function(s,x){ return s+(x.amount||0); },0);
+    return e;
+  }
+  var prev = getPrev(e.date);
+  var prevNozzles = prev && prev.type==='daily' ? prev : null;
+  var pPrev = prevNozzles ? {p1:prevNozzles.p1,p2:prevNozzles.p2,p3:prevNozzles.p3,p4:prevNozzles.p4} : settings.baseline;
+  var dPrev = prevNozzles ? {d1:prevNozzles.d1,d2:prevNozzles.d2,d3:prevNozzles.d3,d4:prevNozzles.d4} : settings.baseline;
+  var prevPtot = (pPrev.p1||0)+(pPrev.p2||0)+(pPrev.p3||0)+(pPrev.p4||0);
+  var prevDtot = (dPrev.d1||0)+(dPrev.d2||0)+(dPrev.d3||0)+(dPrev.d4||0);
+  function nz(cur,prev){ return (cur!=null&&!isNaN(cur)) ? cur : (prev||0); }
+  var curPtot = nz(e.p1,pPrev.p1)+nz(e.p2,pPrev.p2)+nz(e.p3,pPrev.p3)+nz(e.p4,pPrev.p4);
+  var curDtot = nz(e.d1,dPrev.d1)+nz(e.d2,dPrev.d2)+nz(e.d3,dPrev.d3)+nz(e.d4,dPrev.d4);
+  e.pSold = Math.max(0, curPtot - prevPtot);
+  e.dSold = Math.max(0, curDtot - prevDtot);
+  // Cost basis with tanker
+  var prevPcost = (prevNozzles&&prevNozzles.pCost) || settings.rates.pCost;
+  var prevDcost = (prevNozzles&&prevNozzles.dCost) || settings.rates.dCost;
+  e.pCost = e.pRcvd>0 ? (prevPtot*prevPcost + e.pRcvd*(e.pBuy||settings.rates.pBuy))/(prevPtot+e.pRcvd) : prevPcost;
+  e.dCost = e.dRcvd>0 ? (prevDtot*prevDcost + e.dRcvd*(e.dBuy||settings.rates.dBuy))/(prevDtot+e.dRcvd) : prevDcost;
+  e.pSell = e.pSell||settings.rates.pSell;
+  e.dSell = e.dSell||settings.rates.dSell;
+  e.pRev = e.pSold * e.pSell;
+  e.dRev = e.dSold * e.dSell;
+  e.totalRev = e.pRev + e.dRev;
+  e.pMargin = e.pSold * (e.pSell - e.pCost);
+  e.dMargin = e.dSold * (e.dSell - e.dCost);
+  e.totalMargin = e.pMargin + e.dMargin;
+  // Stock variance
+  e.pAMvar = (e.pAM!=null&&e.pAutoAM!=null) ? e.pAM-e.pAutoAM : null;
+  e.dAMvar = (e.dAM!=null&&e.dAutoAM!=null) ? e.dAM-e.dAutoAM : null;
+  e.pPMvar = (e.pPM!=null&&e.pAutoPM!=null) ? e.pPM-e.pAutoPM : null;
+  e.dPMvar = (e.dPM!=null&&e.dAutoPM!=null) ? e.dPM-e.dAutoPM : null;
+  // Collections
+  e.totalColl = (e.cash||0)+(e.upi||0)+(e.swipe||0)+(e.fleet||0);
+  e.cashVar = e.totalColl - e.totalRev;
+  e.totalExp = (e.expenses||[]).reduce(function(s,x){ return s+(x.amount||0); },0);
+  e.netProfit = e.totalMargin - e.totalExp;
+  return e;
+}
+
+// ═══════════════════════════════════════ HELPERS ══════════════════
+function inr(v){ if(v===null||v===undefined||isNaN(v)) return '—'; var a=Math.round(v); return (a<0?'−₹':'₹')+Math.abs(a).toLocaleString('en-IN'); }
+function fL(v){ if(v===null||v===undefined||isNaN(v)) return '—'; return (Math.round(v*10)/10).toLocaleString('en-IN')+' L'; }
+function parseLocal(d){ return (typeof d==='string'&&d.length===10) ? new Date(d+'T00:00:00') : new Date(d); }
+function localISO(dt){ return dt.getFullYear()+'-'+String(dt.getMonth()+1).padStart(2,'0')+'-'+String(dt.getDate()).padStart(2,'0'); }
+function fmtDate(d){ var dt=parseLocal(d); return dt.getDate()+' '+dt.toLocaleDateString('en-IN',{month:'short',year:'numeric'}); }
+function fmtDay(d){ return parseLocal(d).toLocaleDateString('en-IN',{weekday:'short'}); }
+function todayStr(){ return localISO(new Date()); }
+function weekStart(d){ var dt=parseLocal(d); var day=dt.getDay(); var diff=dt.getDate()-day+(day===0?-6:1); var mon=new Date(dt.setDate(diff)); return localISO(mon); }
+function monthStr(d){ return d.slice(0,7); }
+function pct(v,max){ return max>0?Math.min(100,Math.round(v/max*1000)/10):0; }
+function showToast(msg){ var t=document.createElement('div'); t.className='toast'; t.textContent=msg; document.body.appendChild(t); setTimeout(function(){ t.remove(); },2500); }
+
+// ═══════════════════════════════════════ NAVIGATION ══════════════
+var curPage=0, curStep=0, curRTab=0;
+function nav(i){
+  var allowed=ROLE_TABS[currentRole]||[0,1,2,3,4];
+  if(allowed.indexOf(i)<0){ i=allowed[0]; }
+  document.querySelectorAll('.page').forEach(function(p,j){ p.classList.toggle('active',i===j); });
+  document.querySelectorAll('.bn').forEach(function(b,j){ b.classList.toggle('active',i===j); });
+  curPage=i; window.scrollTo(0,0);
+  if(i===0) renderEntry();
+  if(i===1) renderToday();
+  if(i===2) renderReport(curRTab);
+  if(i===3) renderParties();
+  if(i===4) renderHistory();
+  if(i===5) renderSettings();
+  var subs=['Daily Entry','Today\'s Summary','Reports','Parties','History','Settings'];
+  document.getElementById('topSub').textContent=subs[i];
+}
+function rTab(i,btn){
+  document.querySelectorAll('.rtab').forEach(function(b){ b.classList.remove('active'); });
+  btn.classList.add('active'); curRTab=i; renderReport(i);
+}
+// ═══════════════════════════════════════ ENTRY FORM ══════════════
+var draft = {}; // current day's draft
+var STEPS = ['Date','Nozzles','Stock','Collections','Expenses','Review'];
+
+function renderEntry(){
+  renderStepBar();
+  var fn = [stepDate, stepNozzles, stepStock, stepCollections, stepExpenses, stepReview];
+  document.getElementById('entryContent').innerHTML = fn[curStep]();
+  attachExpenseHandlers();
+}
+function renderStepBar(){
+  document.getElementById('stepBar').innerHTML = STEPS.map(function(_,i){
+    return '<div class="step-dot '+(i<curStep?'done':i===curStep?'active':'')+'"></div>';
+  }).join('');
+}
+function goStep(i){ curStep=i; renderEntry(); window.scrollTo(0,0); }
+
+function stepDate(){
+  var today = todayStr();
+  var existing = entries.find(function(e){ return e.date===today&&e.submitted; });
+  if(!draft.date) draft.date=today;
+  if(!draft.reporter) draft.reporter='';
+  return '<div class="card"><div class="card-title">📅 Step 1 — Date & Reporter</div>'+
+    (existing?'<div class="alert alert-a">⚠ An entry for today already exists. Submitting again will overwrite it.</div>':'')+
+    '<div class="field"><label>Date</label><input type="date" id="e-date" value="'+draft.date+'" max="'+today+'"/></div>'+
+    '<div class="field"><label>Reported by</label><select id="e-reporter">'+
+      ['Shiban','Ganesh','Manager','Mustafa Bhai','Other'].map(function(n){ return '<option'+(draft.reporter===n?' selected':'')+'>'+n+'</option>'; }).join('')+
+    '</select></div></div>'+
+    '<button class="btn btn-blue" onclick="saveDraft0();goStep(1)">Next — Nozzle Readings →</button>';
+}
+function saveDraft0(){
+  draft.date=document.getElementById('e-date').value;
+  draft.reporter=document.getElementById('e-reporter').value;
+}
+
+function stepNozzles(){
+  var prev = getPrev(draft.date);
+  var prevP = prev&&prev.type==='daily'?prev:settings.baseline;
+  var prevD = prev&&prev.type==='daily'?prev:settings.baseline;
+  function nzBlock(id,label,prevVal){
+    var v = draft[id]!==undefined ? draft[id] : '';
+    var sold = (v!==''&&prevVal) ? Math.max(0,parseFloat(v)-prevVal).toFixed(1) : '—';
+    return '<div class="nz-block">'+
+      '<div class="nz-title">'+label+'</div>'+
+      '<div class="grid2">'+
+        '<div class="field"><label>Previous</label><input type="number" step="0.01" value="'+prevVal.toFixed(2)+'" disabled style="background:#f5f5f5;color:var(--text3)"/></div>'+
+        '<div class="field"><label>Today\'s reading</label><input type="number" id="e-'+id+'" step="0.01" value="'+v+'" placeholder="'+prevVal.toFixed(2)+'" oninput="updNz(\''+id+'\','+prevVal+')"/></div>'+
+      '</div>'+
+      '<div class="nz-sold" id="nz-'+id+'">Sold today: <b>'+sold+' L</b></div></div>';
+  }
+  return '<div class="card"><div class="card-title">⛽ Step 2 — MS (Petrol) Nozzles</div>'+
+    nzBlock('p3','🟡 P3 (Main petrol nozzle)',prevP.p3||0)+
+    nzBlock('p4','🟡 P4 (Petrol nozzle)',prevP.p4||0)+
+    '<div style="font-size:11px;color:var(--text3);margin:-4px 0 8px">P1 & P2 rarely change — tap to edit if needed</div>'+
+    '<details><summary style="font-size:12px;color:var(--blue);cursor:pointer;margin-bottom:8px">Show P1 & P2</summary>'+
+    nzBlock('p1','P1 (Petrol)',prevP.p1||0)+nzBlock('p2','P2 (Petrol)',prevP.p2||0)+
+    '</details></div>'+
+    '<div class="card"><div class="card-title">🔵 Step 2 — HSD (Diesel) Nozzles</div>'+
+    nzBlock('d1','🔵 D1 (Main diesel nozzle)',prevD.d1||0)+
+    nzBlock('d2','🔵 D2 (Diesel nozzle)',prevD.d2||0)+
+    '<details><summary style="font-size:12px;color:var(--blue);cursor:pointer;margin-bottom:8px">Show D3 & D4</summary>'+
+    nzBlock('d3','D3 (Diesel)',prevD.d3||0)+nzBlock('d4','D4 (Diesel)',prevD.d4||0)+
+    '</details></div>'+
+    '<div style="display:flex;gap:8px">'+
+    '<button class="btn btn-outline" style="width:auto;padding:13px 20px" onclick="saveDraft1();goStep(0)">← Back</button>'+
+    '<button class="btn btn-blue" style="flex:1" onclick="saveDraft1();goStep(2)">Next — Stock Check →</button></div>';
+}
+function updNz(id, prev){ var v=parseFloat(document.getElementById('e-'+id).value); var el=document.getElementById('nz-'+id); if(!isNaN(v)&&prev){ var s=Math.max(0,v-prev); el.innerHTML='Sold today: <b '+( s>0?'style="color:var(--green)"':'')+'>'+s.toFixed(1)+' L</b>'; }else{ el.innerHTML='Sold today: <b>—</b>'; }}
+function saveDraft1(){
+  ['p1','p2','p3','p4','d1','d2','d3','d4'].forEach(function(k){
+    var el=document.getElementById('e-'+k); if(el){ var v=parseFloat(el.value); if(!isNaN(v)) draft[k]=v; }
+  });
+}
+
+function stepStock(){
+  function stockInput(id,label,val){ return '<div class="field"><label>'+label+'</label><input type="number" id="e-'+id+'" step="0.01" value="'+(val!==undefined&&val!==null?val:'')+'" placeholder="0"/></div>'; }
+  return '<div class="card"><div class="card-title">☀️ Step 3 — Morning Stock (10 AM)</div>'+
+    '<div class="grid2">'+
+    stockInput('pAutoAM','MS Auto (L)',draft.pAutoAM)+stockInput('pAM','MS Dip (L)',draft.pAM)+
+    stockInput('dAutoAM','HSD Auto (L)',draft.dAutoAM)+stockInput('dAM','HSD Dip (L)',draft.dAM)+
+    '</div></div>'+
+    '<div class="card"><div class="card-title">🌙 Step 3 — Evening Stock (10 PM)</div>'+
+    '<div class="grid2">'+
+    stockInput('pAutoPM','MS Auto (L)',draft.pAutoPM)+stockInput('pPM','MS Dip (L)',draft.pPM)+
+    stockInput('dAutoPM','HSD Auto (L)',draft.dAutoPM)+stockInput('dPM','HSD Dip (L)',draft.dPM)+
+    '</div></div>'+
+    '<div style="display:flex;gap:8px">'+
+    '<div id="sfAlerts"></div>'+
+    '<button class="btn btn-outline" style="width:auto;padding:13px 20px" onclick="saveDraft2();goStep(1)">← Back</button>'+
+    '<button class="btn btn-blue" style="flex:1" onclick="saveDraft2();goStep(3)">Next — Collections →</button></div>';
+  // Attach live shortfall checking after render
+  setTimeout(function(){
+    var inputs=['pAM','pAutoAM','dAM','dAutoAM','pPM','pAutoPM','dPM','dAutoPM'];
+    inputs.forEach(function(k){
+      var el=document.getElementById('e-'+k);
+      if(el) el.addEventListener('input',updateSFAlerts);
+    });
+  },50);
+}
+function updateSFAlerts(){
+  var get=function(id){ var el=document.getElementById('e-'+id); return el?parseFloat(el.value):NaN; };
+  var checks=[
+    checkShortfall(get('pAutoAM'),get('pAM'),'MS Morning'),
+    checkShortfall(get('dAutoAM'),get('dAM'),'HSD Morning'),
+    checkShortfall(get('pAutoPM'),get('pPM'),'MS Evening'),
+    checkShortfall(get('dAutoPM'),get('dPM'),'HSD Evening'),
+  ];
+  var el=document.getElementById('sfAlerts');
+  if(el) el.innerHTML=shortfallAlertHTML(checks);
+}
+function saveDraft2(){
+  ['pAutoAM','pAM','dAutoAM','dAM','pAutoPM','pPM','dAutoPM','dPM'].forEach(function(k){
+    var el=document.getElementById('e-'+k); if(el){ var v=parseFloat(el.value); draft[k]=isNaN(v)?null:v; }
+  });
+}
+
+function stepCollections(){
+  function ci(id,label,val){ return '<div class="field"><label>'+label+'</label><input type="number" id="e-'+id+'" step="0.01" value="'+(val==null||isNaN(val)?'':val)+'" placeholder="0"/></div>'; }
+  return '<div class="card"><div class="card-title">💳 Step 4 — Collections</div>'+
+    '<div class="grid2">'+
+    ci('cash','Cash (₹)',draft.cash)+ci('upi','UPI / PhonePe (₹)',draft.upi)+
+    ci('swipe','Swipe Card (₹)',draft.swipe)+ci('fleet','Fleet Card (₹)',draft.fleet)+
+    '</div></div>'+
+    '<div class="card"><div class="card-title">🚛 Tanker Delivery (if any)</div>'+
+    '<div class="alert alert-b" style="margin-bottom:10px;font-size:11px">Enter litres received from tanker today. Leave 0 if no delivery.</div>'+
+    '<div class="grid2">'+
+    ci('pRcvd','MS Tanker received (L)',draft.pRcvd)+ci('pBuy','MS buy rate ₹/L',draft.pBuy||settings.rates.pBuy)+
+    ci('dRcvd','HSD Tanker received (L)',draft.dRcvd)+ci('dBuy','HSD buy rate ₹/L',draft.dBuy||settings.rates.dBuy)+
+    '</div></div>'+
+    '<div class="card"><div class="card-title">📋 Selling Rates Today</div>'+
+    '<div class="grid2">'+
+    ci('pSell','MS Sell ₹/L',draft.pSell||settings.rates.pSell)+
+    ci('dSell','HSD Sell ₹/L',draft.dSell||settings.rates.dSell)+
+    '</div><p style="font-size:11px;color:var(--text3);margin-top:4px">Update only if BPCL has changed rates today.</p></div>'+
+    '<div style="display:flex;gap:8px">'+
+    '<button class="btn btn-outline" style="width:auto;padding:13px 20px" onclick="saveDraft3();goStep(2)">← Back</button>'+
+    '<button class="btn btn-blue" style="flex:1" onclick="saveDraft3();goStep(4)">Next — Expenses →</button></div>';
+}
+function saveDraft3(){
+  ['cash','upi','swipe','fleet','pRcvd','pBuy','dRcvd','dBuy','pSell','dSell'].forEach(function(k){
+    var el=document.getElementById('e-'+k); if(el){ var v=parseFloat(el.value); draft[k]=isNaN(v)?0:v; }
+  });
+}
+
+if(!draft.expenses) draft.expenses=[];
+function stepExpenses(){
+  var items = (draft.expenses||[]).map(function(e,i){
+    return '<div class="exp-item">'+
+      '<div class="exp-name"><div style="font-size:13px;font-weight:600">'+e.name+'</div><div style="font-size:10px;color:var(--text3)">'+e.dept+'</div></div>'+
+      '<div class="exp-amt">'+inr(e.amount)+'</div>'+
+      '<button class="exp-del" onclick="delExp('+i+')">×</button></div>';
+  }).join('');
+  var total=(draft.expenses||[]).reduce(function(s,e){ return s+(e.amount||0); },0);
+  return '<div class="card"><div class="card-title">💸 Step 5 — Expenses Today</div>'+
+    (items?'<div id="exp-list">'+items+'</div><div class="vrow"><span class="vl" style="font-weight:700">Total expenses</span><span class="vv warn">'+inr(total)+'</span></div>':'<p style="font-size:13px;color:var(--text3);text-align:center;padding:12px">No expenses added yet</p><div id="exp-list"></div>')+
+    '</div>'+
+    '<div class="card"><div class="card-title">+ Add Expense</div>'+
+    '<div class="field"><label>Description</label><input type="text" id="exp-name" placeholder="e.g. Tanker bhatta"/></div>'+
+    '<div class="grid2">'+
+    '<div class="field"><label>Amount (₹)</label><input type="number" id="exp-amt" placeholder="0"/></div>'+
+    '<div class="field"><label>Type</label><select id="exp-dept"><option>OFFICE</option><option>SALARY</option><option>MAINTENANCE</option><option>OTHER</option></select></div>'+
+    '</div>'+
+    '<button class="btn btn-outline" onclick="addExp()">+ Add</button></div>'+
+    '<div style="display:flex;gap:8px">'+
+    '<button class="btn btn-outline" style="width:auto;padding:13px 20px" onclick="goStep(3)">← Back</button>'+
+    '<button class="btn btn-blue" style="flex:1" onclick="goStep(5)">Next — Review →</button></div>';
+}
+function attachExpenseHandlers(){}
+function addExp(){
+  var name=document.getElementById('exp-name')?document.getElementById('exp-name').value.trim():'';
+  var amt=parseFloat(document.getElementById('exp-amt')?document.getElementById('exp-amt').value:0);
+  var dept=document.getElementById('exp-dept')?document.getElementById('exp-dept').value:'OFFICE';
+  if(!name||!amt){ showToast('Enter name and amount'); return; }
+  if(!draft.expenses) draft.expenses=[];
+  draft.expenses.push({name:name,amount:amt,dept:dept});
+  renderEntry();
+}
+function delExp(i){ draft.expenses.splice(i,1); renderEntry(); }
+
+function stepReview(){
+  var e=JSON.parse(JSON.stringify(draft));
+  e.type='daily'; e.submitted=false;
+  computeEntry(e);
+  var varClass = Math.abs(e.cashVar)<500?'ok':e.cashVar<0?'warn':'amber';
+  return '<div class="card" style="background:linear-gradient(135deg,var(--blue-d),var(--blue));border:none">'+
+    '<div style="font-size:16px;font-weight:800;color:#fff">'+fmtDate(e.date)+'</div>'+
+    '<div style="font-size:11px;color:rgba(255,255,255,.65);font-family:var(--mono)">By '+e.reporter+'</div></div>'+
+    '<div class="kpi-grid">'+
+    '<div class="kpi y"><div class="kv">'+inr(e.totalRev)+'</div><div class="kl">Total Revenue</div></div>'+
+    '<div class="kpi '+(e.totalMargin>0?'g':'r')+'"><div class="kv">'+inr(e.totalMargin)+'</div><div class="kl">Gross Profit</div></div>'+
+    '<div class="kpi"><div class="kv">'+fL(e.dSold)+'</div><div class="kl">HSD Sold</div></div>'+
+    '<div class="kpi"><div class="kv">'+fL(e.pSold)+'</div><div class="kl">MS Sold</div></div></div>'+
+    '<div class="card"><div class="card-title">Sales & Revenue</div>'+
+    '<div class="vrow"><span class="vl">MS sold @ ₹'+e.pSell+'</span><span class="vv info">'+fL(e.pSold)+' = '+inr(e.pRev)+'</span></div>'+
+    '<div class="vrow"><span class="vl">HSD sold @ ₹'+e.dSell+'</span><span class="vv info">'+fL(e.dSold)+' = '+inr(e.dRev)+'</span></div>'+
+    '<div class="vrow"><span class="vl">MS margin (@ ₹'+(e.pSell-e.pCost).toFixed(2)+'/L)</span><span class="vv ok">'+inr(e.pMargin)+'</span></div>'+
+    '<div class="vrow"><span class="vl">HSD margin (@ ₹'+(e.dSell-e.dCost).toFixed(2)+'/L)</span><span class="vv ok">'+inr(e.dMargin)+'</span></div>'+
+    '</div>'+
+    '<div class="card"><div class="card-title">Collections</div>'+
+    '<div class="vrow"><span class="vl">Cash</span><span class="vv">'+inr(e.cash)+'</span></div>'+
+    '<div class="vrow"><span class="vl">UPI / PhonePe</span><span class="vv">'+inr(e.upi)+'</span></div>'+
+    '<div class="vrow"><span class="vl">Swipe + Fleet card</span><span class="vv">'+inr((e.swipe||0)+(e.fleet||0))+'</span></div>'+
+    '<div class="vrow"><span class="vl">Total collected</span><span class="vv">'+inr(e.totalColl)+'</span></div>'+
+    '<div class="vrow"><span class="vl">Cash variance</span><span class="vv '+varClass+'">'+inr(e.cashVar)+'</span></div>'+
+    '</div>'+
+    '<div class="card"><div class="card-title">Expenses & Net</div>'+
+    '<div class="vrow"><span class="vl">Gross profit</span><span class="vv ok">'+inr(e.totalMargin)+'</span></div>'+
+    '<div class="vrow"><span class="vl">Total expenses</span><span class="vv warn">'+inr(e.totalExp)+'</span></div>'+
+    '<div class="vrow"><span class="vl" style="font-weight:700">Net profit</span><span class="vv '+(e.netProfit>=0?'ok':'warn')+'" style="font-size:15px">'+inr(e.netProfit)+'</span></div>'+
+    '</div>'+
+    (e.pRcvd>0||e.dRcvd>0?'<div class="card"><div class="card-title">🚛 Tanker Deliveries</div>'+
+    (e.pRcvd>0?'<div class="vrow"><span class="vl">MS received</span><span class="vv ok">'+fL(e.pRcvd)+' @ ₹'+e.pBuy+'/L</span></div>':'')+
+    (e.dRcvd>0?'<div class="vrow"><span class="vl">HSD received</span><span class="vv ok">'+fL(e.dRcvd)+' @ ₹'+e.dBuy+'/L</span></div>':'')+
+    '</div>':'')+
+    '<div style="display:flex;gap:8px">'+
+    '<button class="btn btn-outline" style="width:auto;padding:13px 20px" onclick="goStep(4)">← Back</button>'+
+    '<button class="btn btn-green" style="flex:1" onclick="submitEntry()">✅ Submit Entry</button></div>'+
+    '<button class="btn btn-wa" onclick="shareWA()" style="margin-top:8px">📋 Copy for WhatsApp</button>';
+}
+
+function submitEntry(){
+  var e=JSON.parse(JSON.stringify(draft));
+  e.type='daily'; e.submitted=true;
+  e.savedAt=new Date().toISOString();
+  computeEntry(e);
+  // Remove existing entry for same date
+  entries = entries.filter(function(x){ return x.date!==e.date; });
+  entries.push(e);
+  entries.sort(function(a,b){ return a.date.localeCompare(b.date); });
+  saveEntries();
+  draft={};curStep=0;
+  showToast('✓ Entry saved for '+fmtDate(e.date));
+  setTimeout(function(){ nav(1); },600);
+}
+
+function shareWA(){
+  var e=JSON.parse(JSON.stringify(draft)); e.type='daily'; computeEntry(e);
+  var t=['*DOLLY PETROLEUM — DAILY REPORT*',
+    'Date: '+fmtDate(e.date),' By: '+(e.reporter||''),'',
+    '*SALES*','MS sold: '+fL(e.pSold)+' @ ₹'+e.pSell+' = '+inr(e.pRev),
+    'HSD sold: '+fL(e.dSold)+' @ ₹'+e.dSell+' = '+inr(e.dRev),
+    'Total: '+inr(e.totalRev),'',
+    '*COLLECTIONS*','Cash: '+inr(e.cash),'UPI: '+inr(e.upi),'Swipe: '+inr((e.swipe||0)+(e.fleet||0)),
+    'Total: '+inr(e.totalColl),'Variance: '+inr(e.cashVar),'',
+    '*P&L*','Gross profit: '+inr(e.totalMargin),'Expenses: '+inr(e.totalExp),'Net: '+inr(e.netProfit)
+  ].join('\n');
+  navigator.clipboard.writeText(t).then(function(){ showToast('✓ Copied for WhatsApp!'); }).catch(function(){ alert(t); });
+}
+// ═══════════════════════════════════════ TODAY ════════════════════
+function renderToday(){
+  var today = todayStr();
+  var e = entries.filter(function(x){ return x.date===today&&x.submitted; })[0];
+  var el = document.getElementById('todayContent');
+  if(!e){
+    el.innerHTML='<div class="alert alert-a">No entry for today yet.</div>'+
+      '<button class="btn btn-blue" onclick="nav(0)">✏️ Fill Today\'s Entry</button>';
+    return;
+  }
+  el.innerHTML = dayDetailHTML(e);
+}
+
+function dayDetailHTML(e){
+  var vc=Math.abs(e.cashVar)<500?'ok':e.cashVar<0?'warn':'amber';
+  var sfAlerts=getEntryShortfallAlerts(e);
+  return '<div class="card" style="background:linear-gradient(135deg,var(--blue-d),var(--blue));border:none">'+
+    '<div style="font-size:16px;font-weight:800;color:#fff">'+fmtDate(e.date)+'</div>'+
+    '<div style="font-size:11px;color:rgba(255,255,255,.65);font-family:var(--mono)">'+fmtDay(e.date)+' · By '+(e.reporter||'—')+(e.type==='import'?' · Imported':'')+'</div></div>'+
+    sfAlerts+
+    '<div class="kpi-grid">'+
+    '<div class="kpi y"><div class="kv">'+inr(e.totalRev)+'</div><div class="kl">Revenue</div></div>'+
+    '<div class="kpi '+(e.netProfit>=0?'g':'r')+'"><div class="kv">'+inr(e.netProfit)+'</div><div class="kl">Net Profit</div></div>'+
+    '<div class="kpi"><div class="kv">'+fL(e.dSold)+'</div><div class="kl">HSD Sold</div></div>'+
+    '<div class="kpi"><div class="kv">'+fL(e.pSold)+'</div><div class="kl">MS Sold</div></div></div>'+
+    '<div class="card"><div class="card-title">💳 Collections</div>'+
+    '<div class="vrow"><span class="vl">Cash</span><span class="vv">'+inr(e.cash)+'</span></div>'+
+    '<div class="vrow"><span class="vl">UPI / PhonePe</span><span class="vv">'+inr(e.upi)+'</span></div>'+
+    '<div class="vrow"><span class="vl">Swipe + Fleet</span><span class="vv">'+inr((e.swipe||0)+(e.fleet||0))+'</span></div>'+
+    '<div class="vrow"><span class="vl" style="font-weight:700">Total collected</span><span class="vv">'+inr(e.totalColl)+'</span></div>'+
+    '<div class="vrow"><span class="vl">Variance (coll − revenue)</span><span class="vv '+vc+'">'+inr(e.cashVar)+'</span></div>'+
+    '</div>'+
+    (e.type==='daily'?'<div class="card"><div class="card-title">📊 Stock Check</div>'+
+    '<div class="card-sub">Morning (10 AM)</div>'+
+    '<div class="vrow"><span class="vl">MS Dip</span><span class="vv">'+fL(e.pAM)+'</span></div>'+
+    '<div class="vrow"><span class="vl">MS Auto</span><span class="vv">'+fL(e.pAutoAM)+'</span></div>'+
+    '<div class="vrow"><span class="vl">MS Var (Dip − Auto)</span><span class="vv '+(e.pAMvar!=null?(Math.abs(e.pAMvar)<100?'ok':'warn'):'muted')+'">'+fL(e.pAMvar)+'</span></div>'+
+    '<div class="vrow"><span class="vl">HSD Dip</span><span class="vv">'+fL(e.dAM)+'</span></div>'+
+    '<div class="vrow"><span class="vl">HSD Auto</span><span class="vv">'+fL(e.dAutoAM)+'</span></div>'+
+    '<div class="vrow"><span class="vl">HSD Var</span><span class="vv '+(e.dAMvar!=null?(Math.abs(e.dAMvar)<100?'ok':'warn'):'muted')+'">'+fL(e.dAMvar)+'</span></div>'+
+    '<div class="card-sub">Evening (10 PM)</div>'+
+    '<div class="vrow"><span class="vl">MS Dip</span><span class="vv">'+fL(e.pPM)+'</span></div>'+
+    '<div class="vrow"><span class="vl">MS Var</span><span class="vv '+(e.pPMvar!=null?(Math.abs(e.pPMvar)<100?'ok':'warn'):'muted')+'">'+fL(e.pPMvar)+'</span></div>'+
+    '<div class="vrow"><span class="vl">HSD Dip</span><span class="vv">'+fL(e.dPM)+'</span></div>'+
+    '<div class="vrow"><span class="vl">HSD Var</span><span class="vv '+(e.dPMvar!=null?(Math.abs(e.dPMvar)<100?'ok':'warn'):'muted')+'">'+fL(e.dPMvar)+'</span></div>'+
+    '</div>':'')+
+    '<div class="card"><div class="card-title">💸 Expenses ('+inr(e.totalExp)+')</div>'+
+    ((e.expenses&&e.expenses.length)?e.expenses.map(function(x){ return '<div class="exp-item"><div class="exp-name">'+x.name+'<div style="font-size:10px;color:var(--text3)">'+x.dept+'</div></div><div class="exp-amt">'+inr(x.amount)+'</div></div>'; }).join(''):'<p style="font-size:13px;color:var(--text3)">No expenses recorded</p>')+
+    '</div>';
+}
+
+// ═══════════════════════════════════════ REPORTS ══════════════════
+function renderReport(tab){
+  if(tab===0) renderDailyReport();
+  else if(tab===1) renderWeeklyReport();
+  else if(tab===2) renderMonthlyReport();
+  else renderAllTime();
+}
+
+// ── DAILY ─────────────────────────────────────────────────────────
+var rptDate = todayStr();
+function renderDailyReport(){
+  var e = entries.filter(function(x){ return x.date===rptDate&&x.submitted; })[0];
+  document.getElementById('reportContent').innerHTML=
+    '<div style="display:flex;align-items:center;gap:8px;margin-bottom:12px">'+
+    '<input type="date" value="'+rptDate+'" max="'+todayStr()+'" style="flex:1;padding:10px 12px;border:1.5px solid var(--border);border-radius:9px;font-size:14px;font-family:var(--mono)" onchange="rptDate=this.value;renderDailyReport()"/>'+
+    '</div>'+
+    (e ? dayDetailHTML(e) : '<div class="card" style="text-align:center;padding:32px"><p style="font-size:14px;font-weight:700;color:var(--text)">No entry for this date</p></div>');
+}
+
+// ── WEEKLY ────────────────────────────────────────────────────────
+var weekOffset=0;
+function renderWeeklyReport(){
+  var today=new Date(); today.setDate(today.getDate()-weekOffset*7);
+  var dayOfWeek=today.getDay(); var diff=today.getDate()-dayOfWeek+(dayOfWeek===0?-6:1);
+  var monDate=new Date(today.setDate(diff));
+  var sunDate=new Date(monDate); sunDate.setDate(monDate.getDate()+6);
+  var monStr=localISO(monDate);
+  var sunStr=localISO(sunDate);
+  var week=entries.filter(function(e){ return e.date>=monStr&&e.date<=sunStr&&e.submitted; });
+  var tRev=0,tHSD=0,tMS=0,tColl=0,tProfit=0,tExp=0,tMargin=0;
+  week.forEach(function(e){ tRev+=e.totalRev||0; tHSD+=e.dSold||0; tMS+=e.pSold||0; tColl+=e.totalColl||0; tProfit+=e.netProfit||0; tExp+=e.totalExp||0; tMargin+=(e.totalMargin||0); });
+  var label=fmtDate(monStr)+' – '+fmtDate(sunStr);
+  var rows=week.map(function(e){
+    return '<tr class="'+(e.netProfit<0?'loss-row':'')+'">'+
+      '<td><strong>'+e.date.slice(8)+'</strong></td><td style="color:#666;font-size:10px">'+fmtDay(e.date)+'</td>'+
+      '<td class="r info">'+fL(e.dSold)+'</td><td class="r info">'+fL(e.pSold)+'</td>'+
+      '<td class="r" style="font-weight:600">'+inr(e.totalRev)+'</td>'+
+      '<td class="r ok">'+inr(e.totalColl)+'</td>'+
+      '<td class="r warn">'+inr(e.totalExp)+'</td>'+
+      '<td class="r '+(e.netProfit>=0?'ok':'warn')+'" style="font-weight:600">'+inr(e.netProfit)+'</td></tr>';
+  }).join('');
+  if(!rows) rows='<tr><td colspan="8" style="text-align:center;color:var(--text3);padding:20px">No entries this week</td></tr>';
+  document.getElementById('reportContent').innerHTML=
+    '<div style="display:flex;align-items:center;gap:8px;margin-bottom:12px">'+
+    '<button class="btn btn-outline btn-sm" onclick="weekOffset++;renderWeeklyReport()">← Prev</button>'+
+    '<div style="flex:1;text-align:center;font-size:12px;font-weight:700;color:var(--text)">'+label+'</div>'+
+    '<button class="btn btn-outline btn-sm" '+(weekOffset===0?'disabled':'')+' onclick="weekOffset=Math.max(0,weekOffset-1);renderWeeklyReport()">Next →</button></div>'+
+    '<div class="kpi-grid">'+
+    '<div class="kpi y"><div class="kv">'+inr(tRev)+'</div><div class="kl">Revenue</div><div class="ks">'+week.length+' days</div></div>'+
+    '<div class="kpi g"><div class="kv">'+inr(tProfit)+'</div><div class="kl">Net Profit</div></div>'+
+    '<div class="kpi"><div class="kv">'+fL(tHSD)+'</div><div class="kl">HSD Sold</div></div>'+
+    '<div class="kpi"><div class="kv">'+fL(tMS)+'</div><div class="kl">MS Sold</div></div></div>'+
+    '<div class="card">'+
+    '<div class="card-title">Week at a Glance</div>'+
+    '<div class="vrow"><span class="vl">Gross margin</span><span class="vv ok">'+inr(tMargin)+'</span></div>'+
+    '<div class="vrow"><span class="vl">Total expenses</span><span class="vv warn">'+inr(tExp)+'</span></div>'+
+    '<div class="vrow"><span class="vl">Total collected</span><span class="vv ok">'+inr(tColl)+'</span></div></div>'+
+    '<div class="card"><div class="card-title">Daily Register — Week</div>'+
+    '<div class="tbl-wrap"><table><thead><tr><th>Date</th><th>Day</th><th>HSD (L)</th><th>MS (L)</th><th>Revenue</th><th>Collected</th><th>Expenses</th><th>Net</th></tr></thead>'+
+    '<tbody>'+rows+'</tbody></table></div></div>';
+}
+
+// ── MONTHLY ───────────────────────────────────────────────────────
+var rptMonth = todayStr().slice(0,7);
+function renderMonthlyReport(){
+  var months=[...new Set(entries.filter(function(e){ return e.submitted; }).map(function(e){ return e.date.slice(0,7); }))].sort().reverse();
+  if(months.indexOf(rptMonth)<0&&months.length) rptMonth=months[0];
+  var month=entries.filter(function(e){ return e.date.startsWith(rptMonth)&&e.submitted; });
+  var tRev=0,tHSD=0,tMS=0,tColl=0,tProfit=0,tExp=0,tMargin=0,tCash=0,tUPI=0,tSwipe=0;
+  month.forEach(function(e){ tRev+=e.totalRev||0; tHSD+=e.dSold||0; tMS+=e.pSold||0; tColl+=e.totalColl||0; tProfit+=e.netProfit||0; tExp+=e.totalExp||0; tMargin+=(e.totalMargin||0); tCash+=e.cash||0; tUPI+=e.upi||0; tSwipe+=(e.swipe||0)+(e.fleet||0); });
+  var maxRev=Math.max.apply(null,[1].concat(month.map(function(e){ return e.totalRev||0; })));
+  var bars=month.map(function(e){
+    var w=pct(e.totalRev||0,maxRev);
+    return '<div class="bar-row"><div class="bar-label">'+e.date.slice(8)+'</div><div class="bar-track"><div class="bar-fill'+(e.netProfit<0?' amber':'')+'" style="width:'+w+'%"><span class="bar-val">'+(w>25?inr(e.totalRev):'')+'</span></div></div><div class="bar-right">'+(w<=25?inr(e.totalRev):'')+'</div></div>';
+  }).join('');
+  var rows=month.map(function(e){
+    return '<tr class="'+(e.netProfit<0?'loss-row':e.totalRev>700000?'hi-row':'')+'">'+
+      '<td style="white-space:nowrap"><strong>'+e.date.slice(8)+' '+(new Date(e.date)).toLocaleDateString('en-IN',{month:'short'})+'</strong></td>'+
+      '<td style="color:#666;font-size:10px">'+fmtDay(e.date)+'</td>'+
+      '<td class="r info">'+fL(e.dSold)+'</td><td class="r info">'+fL(e.pSold)+'</td>'+
+      '<td class="r" style="font-weight:600">'+inr(e.totalRev)+'</td>'+
+      '<td class="r">'+inr(e.cash)+'</td><td class="r">'+inr(e.upi)+'</td>'+
+      '<td class="r warn">'+inr(e.totalExp)+'</td>'+
+      '<td class="r '+(e.netProfit>=0?'ok':'warn')+'" style="font-weight:600">'+inr(e.netProfit)+'</td></tr>';
+  }).join('');
+  if(!rows) rows='<tr><td colspan="9" style="text-align:center;color:var(--text3);padding:20px">No entries for this month</td></tr>';
+  var mn=new Date(rptMonth+'-01').toLocaleDateString('en-IN',{month:'long',year:'numeric'});
+  document.getElementById('reportContent').innerHTML=
+    '<div class="rtabs" style="margin-bottom:12px">'+
+    months.map(function(m){ return '<button class="rtab'+(m===rptMonth?' active':'')+'" onclick="rptMonth=\''+m+'\';renderMonthlyReport()">'+new Date(m+'-01').toLocaleDateString('en-IN',{month:'short',year:'2-digit'})+'</button>'; }).join('')+
+    '</div>'+
+    '<div class="hero"><h2>'+mn+'</h2><p>'+month.length+' days · HSD '+Math.round(tHSD).toLocaleString('en-IN')+'L · MS '+Math.round(tMS).toLocaleString('en-IN')+'L</p></div>'+
+    '<div class="kpi-grid">'+
+    '<div class="kpi y"><div class="kv">'+inr(tRev)+'</div><div class="kl">Total Revenue</div><div class="ks">Avg '+inr(month.length?tRev/month.length:0)+'/day</div></div>'+
+    '<div class="kpi '+(tProfit>=0?'g':'r')+'"><div class="kv">'+inr(tProfit)+'</div><div class="kl">Net Profit</div></div>'+
+    '<div class="kpi"><div class="kv">'+Math.round(tHSD+tMS).toLocaleString('en-IN')+' L</div><div class="kl">Total Volume</div></div>'+
+    '<div class="kpi r"><div class="kv">'+inr(tExp)+'</div><div class="kl">Expenses</div></div></div>'+
+    '<div class="card"><div class="card-title">Collections Breakdown</div>'+
+    '<div class="vrow"><span class="vl">Cash</span><span class="vv ok">'+inr(tCash)+'</span></div>'+
+    '<div class="vrow"><span class="vl">UPI / PhonePe</span><span class="vv ok">'+inr(tUPI)+'</span></div>'+
+    '<div class="vrow"><span class="vl">Swipe + Fleet</span><span class="vv ok">'+inr(tSwipe)+'</span></div>'+
+    '<div class="vrow"><span class="vl" style="font-weight:700">Total collected</span><span class="vv ok">'+inr(tColl)+'</span></div>'+
+    '</div>'+
+    '<div class="pbox">'+
+    '<div class="pb-title">Monthly P&L — '+mn+'</div>'+
+    '<div class="prow"><span class="pl">Gross margin on sales</span><span class="pv">'+inr(tMargin)+'</span></div>'+
+    '<div class="prow"><span class="pl">Less: total expenses</span><span class="pv exp">−'+inr(tExp)+'</span></div>'+
+    '<div class="prow"><span class="pl"><strong>Net Profit</strong></span><span class="pv big '+(tProfit<0?'exp':'')+'">'+inr(tProfit)+'</span></div></div>'+
+    '<div class="card"><div class="card-title">📊 Daily Revenue Chart</div>'+bars+'</div>'+
+    '<div class="card"><div class="card-title">📋 Daily Register — '+mn+'</div>'+
+    '<div class="tbl-wrap"><table><thead><tr><th>Date</th><th>Day</th><th>HSD (L)</th><th>MS (L)</th><th>Revenue</th><th>Cash</th><th>UPI</th><th>Expenses</th><th>Net</th></tr></thead>'+
+    '<tbody>'+rows+
+    '<tr class="total-row"><td colspan="2"><strong>TOTAL</strong></td>'+
+    '<td class="r info"><strong>'+Math.round(tHSD).toLocaleString('en-IN')+'</strong></td>'+
+    '<td class="r info"><strong>'+Math.round(tMS).toLocaleString('en-IN')+'</strong></td>'+
+    '<td class="r info" style="font-weight:800"><strong>'+inr(tRev)+'</strong></td>'+
+    '<td class="r"><strong>'+inr(tCash)+'</strong></td><td class="r"><strong>'+inr(tUPI)+'</strong></td>'+
+    '<td class="r warn"><strong>'+inr(tExp)+'</strong></td>'+
+    '<td class="r '+(tProfit>=0?'ok':'warn')+'"><strong>'+inr(tProfit)+'</strong></td></tr>'+
+    '</tbody></table></div></div>';
+}
+
+// ── ALL-TIME ──────────────────────────────────────────────────────
+function renderAllTime(){
+  var months=[...new Set(entries.filter(function(e){ return e.submitted; }).map(function(e){ return e.date.slice(0,7); }))].sort();
+  var rows=months.map(function(m){
+    var days=entries.filter(function(e){ return e.date.startsWith(m)&&e.submitted; });
+    var r={rev:0,hsd:0,ms:0,coll:0,profit:0,exp:0,margin:0};
+    days.forEach(function(e){ r.rev+=e.totalRev||0; r.hsd+=e.dSold||0; r.ms+=e.pSold||0; r.coll+=e.totalColl||0; r.profit+=e.netProfit||0; r.exp+=e.totalExp||0; r.margin+=(e.totalMargin||0); });
+    var mn=new Date(m+'-01').toLocaleDateString('en-IN',{month:'short',year:'numeric'});
+    return {m:m,mn:mn,days:days.length,r:r};
+  });
+  var totRev=rows.reduce(function(s,r){ return s+r.r.rev; },0);
+  var totProfit=rows.reduce(function(s,r){ return s+r.r.profit; },0);
+  var totHSD=rows.reduce(function(s,r){ return s+r.r.hsd; },0);
+  var totMS=rows.reduce(function(s,r){ return s+r.r.ms; },0);
+  var maxRev=Math.max.apply(null,[1].concat(rows.map(function(r){ return r.r.rev; })));
+  var bars=rows.map(function(r){
+    var w=pct(r.r.rev,maxRev);
+    return '<div class="bar-row"><div class="bar-label" style="width:48px">'+r.mn.split(' ')[0]+'</div><div class="bar-track"><div class="bar-fill" style="width:'+w+'%"><span class="bar-val">'+(w>20?inr(r.r.rev):'')+'</span></div></div><div class="bar-right">'+(w<=20?inr(r.r.rev):'')+'</div></div>';
+  }).join('');
+  var tableRows=rows.map(function(r){
+    return '<tr onclick="rptMonth=\''+r.m+'\';rTab(2,document.querySelectorAll(\'.rtab\')[2])" style="cursor:pointer">'+
+      '<td><strong>'+r.mn+'</strong></td><td class="r muted">'+r.days+'</td>'+
+      '<td class="r info">'+Math.round(r.r.hsd).toLocaleString('en-IN')+' L</td>'+
+      '<td class="r info">'+Math.round(r.r.ms).toLocaleString('en-IN')+' L</td>'+
+      '<td class="r" style="font-weight:700">'+inr(r.r.rev)+'</td>'+
+      '<td class="r ok">'+inr(r.r.margin)+'</td>'+
+      '<td class="r warn">'+inr(r.r.exp)+'</td>'+
+      '<td class="r '+(r.r.profit>=0?'ok':'warn')+'" style="font-weight:700">'+inr(r.r.profit)+'</td>'+
+      '<td class="r" style="font-size:10px">→</td></tr>';
+  }).join('');
+  document.getElementById('reportContent').innerHTML=
+    '<div class="hero"><h2>All-time Summary</h2><p>'+rows.length+' months · Click any row for full monthly report</p></div>'+
+    '<div class="kpi-grid">'+
+    '<div class="kpi y"><div class="kv">'+inr(totRev)+'</div><div class="kl">Total Revenue</div></div>'+
+    '<div class="kpi g"><div class="kv">'+inr(totProfit)+'</div><div class="kl">Net Profit</div></div>'+
+    '<div class="kpi"><div class="kv">'+Math.round(totHSD).toLocaleString('en-IN')+' L</div><div class="kl">Total HSD</div></div>'+
+    '<div class="kpi"><div class="kv">'+Math.round(totMS).toLocaleString('en-IN')+' L</div><div class="kl">Total MS</div></div></div>'+
+    '<div class="card"><div class="card-title">Revenue by Month</div>'+bars+'</div>'+
+    '<div class="card"><div class="card-title">Month-by-Month</div>'+
+    '<div class="tbl-wrap"><table><thead><tr><th>Month</th><th>Days</th><th>HSD (L)</th><th>MS (L)</th><th>Revenue</th><th>Margin</th><th>Expenses</th><th>Net Profit</th><th></th></tr></thead>'+
+    '<tbody>'+tableRows+
+    '<tr class="total-row"><td><strong>TOTAL</strong></td><td class="r">'+rows.reduce(function(s,r){return s+r.days;},0)+'</td>'+
+    '<td class="r info"><strong>'+Math.round(totHSD).toLocaleString('en-IN')+' L</strong></td>'+
+    '<td class="r info"><strong>'+Math.round(totMS).toLocaleString('en-IN')+' L</strong></td>'+
+    '<td class="r info" style="font-weight:800"><strong>'+inr(totRev)+'</strong></td>'+
+    '<td class="r ok"><strong>'+inr(rows.reduce(function(s,r){return s+r.r.margin;},0))+'</strong></td>'+
+    '<td class="r warn"><strong>'+inr(rows.reduce(function(s,r){return s+r.r.exp;},0))+'</strong></td>'+
+    '<td class="r '+(totProfit>=0?'ok':'warn')+'"><strong>'+inr(totProfit)+'</strong></td><td></td></tr>'+
+    '</tbody></table></div></div>';
+}
+
+// ═══════════════════════════════════════ HISTORY ══════════════════
+function renderHistory(){
+  var sorted=[...entries].filter(function(e){ return e.submitted; }).reverse();
+  if(!sorted.length){
+    document.getElementById('histList').innerHTML='<p style="text-align:center;color:var(--text3);padding:24px">No entries yet</p>'; return;
+  }
+  document.getElementById('histList').innerHTML=sorted.map(function(e){
+    return '<div class="hist-item" onclick="showDetail(\''+e.date+'\')">'+
+      '<div class="hist-date"><div class="hist-d">'+e.date.slice(8)+'</div><div class="hist-m">'+new Date(e.date).toLocaleDateString('en-IN',{month:'short',year:'2-digit'})+'</div></div>'+
+      '<div class="hist-info">'+
+        '<div class="hist-rev">'+inr(e.totalRev)+'</div>'+
+        '<div class="hist-vol">HSD '+fL(e.dSold)+' · MS '+fL(e.pSold)+(e.type==='import'?' · Imported':'')+'</div>'+
+      '</div>'+
+      '<div class="hist-profit '+(e.netProfit>=0?'ok':'warn')+'">'+inr(e.netProfit)+'</div>'+
+      '<div class="hist-arrow">›</div></div>';
+  }).join('');
+}
+
+function showDetail(date){
+  var e=entries.find(function(x){ return x.date===date; });
+  if(!e) return;
+  document.getElementById('detailContent').innerHTML=
+    '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">'+
+    '<div class="modal-title">'+fmtDate(e.date)+' · '+fmtDay(e.date)+'</div>'+
+    '<button onclick="closeModal()" style="background:var(--border);border:none;border-radius:8px;padding:6px 12px;cursor:pointer;font-size:13px">✕ Close</button></div>'+
+    dayDetailHTML(e)+
+    (e.type==='daily'?'<button class="btn btn-outline" onclick="loadForEdit(\''+e.date+'\')">✏️ Edit this entry</button>':'');
+  document.getElementById('detailModal').classList.remove('hidden');
+}
+function closeModal(evt){ if(!evt||evt.target===document.getElementById('detailModal')) document.getElementById('detailModal').classList.add('hidden'); }
+function loadForEdit(date){
+  var e=entries.find(function(x){ return x.date===date; });
+  if(!e) return;
+  draft=JSON.parse(JSON.stringify(e)); curStep=0;
+  document.getElementById('detailModal').classList.add('hidden');
+  nav(0);
+}
+
+// ═══════════════════════════════════════ SETTINGS ════════════════
+function renderSettings(){
+  var s=settings;
+  document.getElementById('s-pSell').value=s.rates.pSell;
+  document.getElementById('s-pBuy').value=s.rates.pBuy;
+  document.getElementById('s-dSell').value=s.rates.dSell;
+  document.getElementById('s-dBuy').value=s.rates.dBuy;
+  ['p1','p2','p3','p4','d1','d2','d3','d4'].forEach(function(k){ document.getElementById('s-'+k).value=s.baseline[k]; });
+  var submitted=entries.filter(function(e){ return e.submitted; });
+  document.getElementById('s-count').textContent=submitted.length+' entries';
+  document.getElementById('s-last').textContent=submitted.length?fmtDate(submitted[submitted.length-1].date):'—';
+  document.getElementById('s-loggedIn').textContent=(currentDisplayName||'—')+' ('+currentRole+')';
+  // Cloud sync status card
+  var spCard=document.getElementById('spSyncCard');
+  var spStatusEl=document.getElementById('spSyncStatus');
+  if(spCard){ spCard.style.display=(currentRole==='admin')?'':'none'; }
+  if(spStatusEl){
+    spStatusEl.className='alert alert-g';
+    spStatusEl.innerHTML='✓ Synced with company SharePoint'+(spSync.lastPull?' · Last pull: '+spSync.lastPull.toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit'}):'')+(spSync.lastPush?' · Last push: '+spSync.lastPush.toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit'}):'');
+  }
+  var umc=document.getElementById('userMgmtCard');
+  if(currentRole==='admin'){ umc.style.display=''; renderUserList(); }
+  else { umc.style.display='none'; }
+}
+
+function exportBackup(){
+  var data={settings:settings,entries:entries,exported:new Date().toISOString()};
+  var blob=new Blob([JSON.stringify(data,null,2)],{type:'application/json'});
+  var a=document.createElement('a'); a.href=URL.createObjectURL(blob);
+  a.download='Dolly_Backup_'+todayStr()+'.json'; a.click();
+  showToast('✓ Backup exported');
+}
+function importBackup(inp){
+  var f=inp.files[0]; if(!f) return;
+  var r=new FileReader(); r.onload=function(ev){
+    try{
+      var d=JSON.parse(ev.target.result);
+      if(d.settings) settings=d.settings;
+      if(d.entries){ 
+        // Merge: keep existing entries not in backup, add all from backup
+        var existing=entries.map(function(e){ return e.date; });
+        d.entries.forEach(function(e){ if(!existing.includes(e.date)){ entries.push(e); }});
+        entries.sort(function(a,b){ return a.date.localeCompare(b.date); });
+      }
+      saveEntries(); try{ localStorage.setItem(SS,JSON.stringify(settings)); }catch(err){}
+      showToast('✓ Backup imported'); renderSettings();
+    }catch(err){ alert('Invalid backup file'); }
+  }; r.readAsText(f);
+}
+function clearAll(){ if(!confirm('Delete ALL data? This cannot be undone!')) return; localStorage.removeItem(SK); localStorage.removeItem(SS); entries=[]; settings=JSON.parse(JSON.stringify(DEF_SETTINGS)); showToast('✓ All data cleared'); nav(4); }
+
+
+// ═══════════════════════════════════════ PARTIES ════════════════
+var SK_PARTIES='dp_parties_v1';
+var DEFAULT_PARTIES=[
+  {id:'p1',name:'AAMIR TRANSPORT',fuelType:'HSD',hsdRate:90.65,msRate:null,phone:'',openingBalance:0},
+  {id:'p2',name:'ARVINDO',fuelType:'HSD',hsdRate:90.65,msRate:null,phone:'',openingBalance:0},
+  {id:'p3',name:'KRISHABH CON.',fuelType:'HSD',hsdRate:90.65,msRate:null,phone:'',openingBalance:0},
+  {id:'p4',name:'BALAJI TRANSPO',fuelType:'HSD',hsdRate:90.65,msRate:null,phone:'',openingBalance:0},
+  {id:'p5',name:'SS TRANSPORT',fuelType:'HSD',hsdRate:90.65,msRate:null,phone:'',openingBalance:0},
+  {id:'p6',name:'VIKAS COAL',fuelType:'HSD',hsdRate:90.65,msRate:null,phone:'',openingBalance:0},
+];
+var SK_PAYMENTS='dp_payments_v1';
+
+function getParties(){
+  try{ var p=localStorage.getItem(SK_PARTIES); if(p) return JSON.parse(p); }catch(e){}
+  return DEFAULT_PARTIES.map(function(p){ return Object.assign({},p); });
+}
+function saveParties(p){ try{ localStorage.setItem(SK_PARTIES,JSON.stringify(p)); }catch(e){} if(typeof spSync!=='undefined'&&spSync.active) spSync.schedulePush(); }
+function getPayments(){
+  try{ var p=localStorage.getItem(SK_PAYMENTS); if(p) return JSON.parse(p); }catch(e){}
+  return [];
+}
+function savePayments(p){ try{ localStorage.setItem(SK_PAYMENTS,JSON.stringify(p)); }catch(e){} if(typeof spSync!=='undefined'&&spSync.active) spSync.schedulePush(); }
+
+// Get all credit sales for a party from entries
+function getPartySales(partyName){
+  var sales=[];
+  entries.filter(function(e){ return e.submitted; }).forEach(function(e){
+    var fb=e.fleetBreakdown||{};
+    if(fb[partyName]){
+      var party=getParties().find(function(p){ return p.name===partyName; });
+      var rate=(party&&party.hsdRate)||90.65;
+      var amt=fb[partyName];
+      var litres=Math.round(amt/rate*10)/10;
+      sales.push({date:e.date,type:'sale',amount:amt,litres:litres,rate:rate});
+    }
+  });
+  return sales;
+}
+
+// Get payments for a party
+function getPartyPayments(partyName){
+  return getPayments().filter(function(p){ return p.party===partyName; })
+    .map(function(p){ return Object.assign({type:'payment'},p); });
+}
+
+// Compute outstanding balance for a party
+function getPartyBalance(partyName){
+  var party=getParties().find(function(p){ return p.name===partyName; });
+  var ob=(party&&party.openingBalance)||0;
+  var sales=getPartySales(partyName);
+  var payments=getPartyPayments(partyName);
+  var totalSales=sales.reduce(function(s,x){ return s+x.amount; },0);
+  var totalPaid=payments.reduce(function(s,x){ return s+x.amount; },0);
+  return ob+totalSales-totalPaid;
+}
+
+function recordPayment(partyName){
+  var amtStr=prompt('Payment received from '+partyName+' (₹):');
+  if(!amtStr) return;
+  var amt=parseFloat(amtStr);
+  if(isNaN(amt)||amt<=0){ showToast('Invalid amount'); return; }
+  var note=prompt('Note (optional, e.g. cash/cheque/NEFT):') || '';
+  var payments=getPayments();
+  payments.push({party:partyName,date:todayStr(),amount:amt,note:note});
+  savePayments(payments);
+  showToast('✓ Payment ₹'+Math.round(amt).toLocaleString('en-IN')+' recorded for '+partyName);
+  renderParties();
+}
+
+function editPartyRate(idx){
+  var parties=getParties();
+  var p=parties[idx];
+  var newRate=prompt('HSD rate for '+p.name+' (current: ₹'+p.hsdRate+'/L):');
+  if(!newRate) return;
+  var r=parseFloat(newRate);
+  if(isNaN(r)||r<50){ showToast('Invalid rate'); return; }
+  parties[idx].hsdRate=r;
+  parties[idx].updatedAt=new Date().toISOString();
+  saveParties(parties);
+  showToast('✓ Rate updated: '+p.name+' → ₹'+r+'/L');
+  renderParties();
+}
+
+function addParty(){
+  var name=(document.getElementById('np-name')||{}).value||'';
+  var hsdRate=parseFloat((document.getElementById('np-hsdrate')||{}).value||0);
+  var ob=parseFloat((document.getElementById('np-ob')||{}).value||0)||0;
+  if(!name.trim()){ showToast('Enter party name'); return; }
+  if(isNaN(hsdRate)||hsdRate<50){ showToast('Enter valid HSD rate'); return; }
+  var parties=getParties();
+  if(parties.find(function(p){ return p.name.toLowerCase()===name.toLowerCase(); })){ showToast('Party already exists'); return; }
+  parties.push({id:'p'+Date.now(),name:name.trim(),fuelType:'HSD',hsdRate:hsdRate,msRate:null,phone:'',openingBalance:ob,updatedAt:new Date().toISOString()});
+  saveParties(parties);
+  document.getElementById('np-name').value=''; document.getElementById('np-hsdrate').value=''; document.getElementById('np-ob').value='';
+  showToast('✓ Party added'); renderParties();
+}
+
+function showPartyDetail(name){
+  var sales=getPartySales(name);
+  var payments=getPartyPayments(name);
+  var all=[].concat(sales,payments).sort(function(a,b){ return a.date.localeCompare(b.date); });
+  var bal=getPartyBalance(name);
+  var rows=all.map(function(t){
+    if(t.type==='sale'){
+      return '<tr><td>'+fmtDate(t.date)+'</td><td><span class="badge bb">Sale</span></td>'+
+        '<td class="r">'+fL(t.litres)+'</td><td class="r">₹'+t.rate+'</td>'+
+        '<td class="r warn">'+inr(t.amount)+'</td><td class="r">—</td></tr>';
+    } else {
+      return '<tr><td>'+fmtDate(t.date)+'</td><td><span class="badge bg">Payment</span></td>'+
+        '<td class="r">—</td><td class="r">—</td>'+
+        '<td class="r">—</td><td class="r ok">'+inr(t.amount)+'</td></tr>';
+    }
+  }).join('');
+  var parties=getParties();
+  var pidx=parties.findIndex(function(p){ return p.name===name; });
+  document.getElementById('detailContent').innerHTML=
+    '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">'+
+    '<div class="modal-title">🤝 '+name+'</div>'+
+    '<button onclick="closeModal()" style="background:var(--border);border:none;border-radius:8px;padding:6px 12px;cursor:pointer;font-size:13px">✕</button></div>'+
+    '<div class="kpi-grid" style="margin-bottom:12px">'+
+    '<div class="kpi '+(bal>0?'r':'g')+'"><div class="kv">'+inr(bal)+'</div><div class="kl">Outstanding</div></div>'+
+    '<div class="kpi"><div class="kv">'+inr(sales.reduce(function(s,x){ return s+x.amount; },0))+'</div><div class="kl">Total Sales</div></div>'+
+    '<div class="kpi"><div class="kv">'+inr(payments.reduce(function(s,x){ return s+x.amount; },0))+'</div><div class="kl">Total Paid</div></div>'+
+    '<div class="kpi"><div class="kv">₹'+(getParties().find(function(p){return p.name===name;})||{hsdRate:90.65}).hsdRate+'/L</div><div class="kl">HSD Rate</div></div>'+
+    '</div>'+
+    '<div style="display:flex;gap:8px;margin-bottom:12px">'+
+    '<button class="btn btn-green btn-sm" style="width:auto;padding:10px 18px;font-size:13px" onclick="recordPayment(\''+name+'\')">💰 Record Payment</button>'+
+    (currentRole==='admin'&&pidx>=0?'<button class="btn btn-outline btn-sm" style="width:auto;padding:10px 18px;font-size:13px" onclick="editPartyRate('+pidx+');closeModal()">✏️ Edit Rate</button>':'')+'</div>'+
+    (rows?'<div class="tbl-wrap"><table><thead><tr><th>Date</th><th>Type</th><th>Litres</th><th>Rate</th><th>Debit</th><th>Credit</th></tr></thead><tbody>'+rows+'</tbody></table></div>':
+    '<p style="text-align:center;color:var(--text3);padding:20px">No transactions yet</p>');
+  document.getElementById('detailModal').classList.remove('hidden');
+}
+
+function renderParties(){
+  var parties=getParties();
+  var totalOut=0;
+  var cards=parties.map(function(p,i){
+    var bal=getPartyBalance(p.name);
+    totalOut+=Math.max(0,bal);
+    var lastSale=getPartySales(p.name).slice(-1)[0];
+    return '<div class="card" style="cursor:pointer" onclick="showPartyDetail(this.dataset.n)" data-n="'+p.name.replace(/"/g,'&quot;')+'" >'+
+      '<div style="display:flex;align-items:center;justify-content:space-between">'+
+      '<div>'+
+        '<div style="font-size:14px;font-weight:700;color:var(--text)">'+p.name+'</div>'+
+        '<div style="font-size:11px;color:var(--text3);font-family:var(--mono)">HSD @ ₹'+p.hsdRate+'/L'+(lastSale?' · Last: '+fmtDate(lastSale.date):'')+'</div>'+
+      '</div>'+
+      '<div style="text-align:right">'+
+        '<div style="font-size:16px;font-weight:700;'+(bal>0?'color:var(--red)':'color:var(--green)')+'">'+inr(Math.abs(bal))+'</div>'+
+        '<div style="font-size:10px;color:var(--text3)">'+(bal>0?'Outstanding':(bal<0?'Overpaid':'Clear'))+'</div>'+
+      '</div></div></div>';
+  }).join('');
+
+  // Summary bar
+  document.getElementById('partySummaryCards').innerHTML=
+    '<div class="kpi-grid" style="margin-bottom:12px">'+
+    '<div class="kpi r"><div class="kv">'+inr(totalOut)+'</div><div class="kl">Total Outstanding</div></div>'+
+    '<div class="kpi"><div class="kv">'+parties.length+'</div><div class="kl">Credit Parties</div></div>'+
+    '</div>';
+
+  document.getElementById('partyListCards').innerHTML= cards +
+    (currentRole==='admin' ?
+    '<div class="card"><div class="card-title">+ Add Party</div>'+
+    '<div class="grid3">'+
+    '<div class="field"><label>Party Name</label><input type="text" id="np-name" placeholder="e.g. VIKAS COAL"/></div>'+
+    '<div class="field"><label>HSD Rate ₹/L</label><input type="number" id="np-hsdrate" step="0.01" value="90.65"/></div>'+
+    '<div class="field"><label>Opening Balance ₹</label><input type="number" id="np-ob" placeholder="0"/></div>'+
+    '</div>'+
+    '<button class="btn btn-blue" onclick="addParty()">+ Add Party</button></div>' : '');
+}
+
+// ═══════════════════════════════════════ SHORTFALL ALARMS ════════
+var SHORTFALL_THRESHOLD=100; // litres — configurable in settings
+
+function checkShortfall(auto, dip, fuelLabel){
+  if(auto===null||dip===null||isNaN(auto)||isNaN(dip)) return null;
+  var diff=dip-auto; // positive = dip > auto (surplus), negative = shortfall
+  return {diff:diff, shortfall:diff<-SHORTFALL_THRESHOLD, surplus:diff>SHORTFALL_THRESHOLD, label:fuelLabel};
+}
+
+function shortfallAlertHTML(results){
+  var html='';
+  results.forEach(function(r){
+    if(!r) return;
+    if(r.shortfall){
+      html+='<div class="alert alert-r">⚠ <strong>'+r.label+' SHORTFALL: '+Math.abs(r.diff).toFixed(1)+' L</strong> — Dip reading is '+Math.abs(r.diff).toFixed(1)+'L less than automation. Investigate immediately.</div>';
+    } else if(r.surplus && Math.abs(r.diff)>200){
+      html+='<div class="alert alert-a">ℹ '+r.label+' surplus: +'+r.diff.toFixed(1)+'L (Dip > Auto). Verify dip measurement.</div>';
+    }
+  });
+  return html;
+}
+
+function getEntryShortfallAlerts(e){
+  if(!e||e.type==='import') return '';
+  var checks=[];
+  if(e.pAM!=null&&e.pAutoAM!=null) checks.push(checkShortfall(e.pAutoAM,e.pAM,'MS Morning'));
+  if(e.dAM!=null&&e.dAutoAM!=null) checks.push(checkShortfall(e.dAutoAM,e.dAM,'HSD Morning'));
+  if(e.pPM!=null&&e.pAutoPM!=null) checks.push(checkShortfall(e.pAutoPM,e.pPM,'MS Evening'));
+  if(e.dPM!=null&&e.dAutoPM!=null) checks.push(checkShortfall(e.dAutoPM,e.dPM,'HSD Evening'));
+  return shortfallAlertHTML(checks);
+}
+
+
+// ═══════════════════════════════════════ CLOUD SYNC (Microsoft Graph) ═══
+var spSync = {
+  active: true,
+  lastPull: null, lastPush: null, pushTimer: null, pendingPush: false,
+  siteId: null,
+
+  init: function(){ this.active=true; return true; },
+
+  updateStatus: function(msg){
+    var el = document.getElementById('syncStatus');
+    if(!el) return;
+    el.innerHTML = msg ? ('☁ '+msg) : '';
+  },
+
+  getSiteId: async function(){
+    if(this.siteId) return this.siteId;
+    try{ var c=localStorage.getItem('dp_graph_siteid'); if(c){ this.siteId=c; return c; } }catch(e){}
+    var tok=await getGraphToken(); if(!tok) return null;
+    try{
+      var r=await fetch('https://graph.microsoft.com/v1.0/sites/'+GRAPH_SITE_HOST+':'+GRAPH_SITE_PATH+'?$select=id',{headers:{'Authorization':'Bearer '+tok}});
+      if(!r.ok){ console.log('siteId error',r.status); return null; }
+      var j=await r.json(); this.siteId=j.id;
+      try{ localStorage.setItem('dp_graph_siteid',j.id); }catch(e){}
+      return this.siteId;
+    }catch(e){ console.log('siteId error',e); return null; }
+  },
+
+  pull: async function(){
+    if(!this.active) return false;
+    if(!currentUser) return false;
+    this.updateStatus('⟳');
+    try{
+      var tok=await getGraphToken(); if(!tok){ this.updateStatus('⚠ auth'); return false; }
+      var sid=await this.getSiteId(); if(!sid){ this.updateStatus('⚠ site'); return false; }
+      var resp = await fetch('https://graph.microsoft.com/v1.0/sites/'+sid+'/drive/root:/'+GRAPH_FILE_PATH+':/content',{headers:{'Authorization':'Bearer '+tok}});
+      if(!resp.ok){ this.updateStatus('⚠ no file'); return false; }
+      var data = await resp.json();
+      var changed = false;
+
+      if(data.entries && data.entries.length){
+        var localDates = entries.map(function(e){ return e.date; });
+        data.entries.forEach(function(e){
+          if(localDates.indexOf(e.date)<0){
+            entries.push(e); changed=true;
+          } else {
+            var local = entries.find(function(x){ return x.date===e.date; });
+            if(local && e.savedAt && (!local.savedAt || e.savedAt > local.savedAt)){
+              entries[entries.indexOf(local)] = e; changed=true;
+            }
+          }
+        });
+        if(changed){
+          entries.sort(function(a,b){ return a.date.localeCompare(b.date); });
+          try{ localStorage.setItem(SK, JSON.stringify(entries)); }catch(ex){}
+        }
+      }
+      if(data.settings)  { Object.assign(settings, data.settings); try{ localStorage.setItem(SS,JSON.stringify(settings)); }catch(ex){} }
+      if(data.parties && data.parties.length){ try{
+        var lp=getParties();
+        data.parties.forEach(function(rp){
+          var i=-1;
+          for(var k=0;k<lp.length;k++){ if(lp[k].id===rp.id){ i=k; break; } }
+          if(i<0){ lp.push(rp); }
+          else if(rp.updatedAt && (!lp[i].updatedAt || rp.updatedAt>lp[i].updatedAt)){ lp[i]=rp; }
+        });
+        localStorage.setItem(SK_PARTIES,JSON.stringify(lp));
+      }catch(ex){} }
+      if(data.payments && data.payments.length){ try{
+        var lpay=getPayments();
+        var pkey=function(p){ return p.party+'|'+p.date+'|'+p.amount+'|'+(p.note||''); };
+        var seen={};
+        lpay.forEach(function(p){ seen[pkey(p)]=1; });
+        data.payments.forEach(function(p){ if(!seen[pkey(p)]){ lpay.push(p); seen[pkey(p)]=1; } });
+        localStorage.setItem(SK_PAYMENTS,JSON.stringify(lpay));
+      }catch(ex){} }
+      if(data.users && data.users.length){ try{ localStorage.setItem(SK_USERS,JSON.stringify(data.users)); }catch(ex){} }
+
+      this.lastPull = new Date();
+      this.updateStatus('✓ '+this.lastPull.toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit'}));
+      if(changed){
+        showToast('✓ Synced — '+data.entries.length+' entries loaded');
+        if(curPage===1) renderToday();
+        else if(curPage===2) renderReport(curRTab);
+        else if(curPage===3) renderParties();
+        else if(curPage===4) renderHistory();
+      }
+      return true;
+    }catch(e){ console.log('pull error',e); this.updateStatus('⚠ pull failed'); return false; }
+  },
+
+  push: async function(){
+    if(!this.active) return false;
+    if(!currentUser) return false;
+    try{
+      var tok=await getGraphToken(); if(!tok){ this.updateStatus('⚠ auth'); this.pendingPush=true; return false; }
+      var sid=await this.getSiteId(); if(!sid){ this.updateStatus('⚠ site'); this.pendingPush=true; return false; }
+      var payload = JSON.stringify({
+        entries: entries,
+        settings: settings,
+        parties: getParties(),
+        payments: getPayments(),
+        users: getUsers(),
+        lastUpdated: new Date().toISOString(),
+        updatedBy: currentDisplayName||'unknown'
+      });
+      var resp = await fetch('https://graph.microsoft.com/v1.0/sites/'+sid+'/drive/root:/'+GRAPH_FILE_PATH+':/content',
+        {method:'PUT', headers:{'Authorization':'Bearer '+tok,'Content-Type':'application/json'}, body: payload});
+      if(resp.ok){
+        this.lastPush = new Date();
+        this.pendingPush = false;
+        this.updateStatus('✓ '+this.lastPush.toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit'}));
+        return true;
+      } else {
+        console.log('push HTTP error', resp.status);
+        this.pendingPush = true;
+        this.updateStatus('⚠ push '+resp.status);
+      }
+    }catch(e){ console.log('push error',e); this.pendingPush=true; this.updateStatus('⚠ push failed'); }
+    return false;
+  },
+
+  schedulePush: function(){
+    var self = this;
+    clearTimeout(this.pushTimer);
+    this.pushTimer = setTimeout(function(){ self.push(); }, 2000);
+  },
+
+  startAutoRefresh: function(){
+    var self = this;
+    setInterval(function(){ self.pull(); if(self.pendingPush) self.push(); }, 120000); // every 2 min
+  }
+};
+
+// ═══════════════════════════════════ AUTH (Microsoft sign-in) ═══
+// ── Configuration (filled in during deployment) ──
+var AAD_CLIENT_ID='__CLIENT_ID__';
+var AAD_TENANT='e9538cc7-6ab4-4ffd-a772-2eaa1fdaa2e2';
+var GRAPH_SITE_HOST='oregenesis.sharepoint.com';
+var GRAPH_SITE_PATH='/sites/dolly';
+var GRAPH_FILE_PATH='Operations/Reporting/dolly_ops_data.json';
+var GRAPH_SCOPES=['User.Read','Files.ReadWrite.All'];
+
+var SK_USERS='dp_users_v4';
+var currentUser=null, currentRole=null, currentDisplayName=null;
+
+// admin sees Entry/Today/Reports/Parties/History/Settings; staff sees all except Settings
+var ROLE_TABS={admin:[0,1,2,3,4,5], staff:[0,1,2,3,4]};
+var msalApp=null;
+
+function escHtml(s){ return String(s==null?'':s).replace(/[&<>"']/g,function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]; }); }
+
+function getUsers(){
+  try{ var u=localStorage.getItem(SK_USERS); if(u) return JSON.parse(u); }catch(e){}
+  return [];
+}
+function saveUsersStore(u){ try{ localStorage.setItem(SK_USERS,JSON.stringify(u)); }catch(e){} if(typeof spSync!=='undefined'&&spSync.active) spSync.schedulePush(); }
+
+async function getGraphToken(){
+  if(!msalApp) return null;
+  var acct=msalApp.getActiveAccount()||msalApp.getAllAccounts()[0];
+  if(!acct) return null;
+  try{
+    var res=await msalApp.acquireTokenSilent({scopes:GRAPH_SCOPES,account:acct});
+    return res.accessToken;
+  }catch(e){
+    console.log('silent token failed',e);
+    try{ await msalApp.acquireTokenRedirect({scopes:GRAPH_SCOPES,account:acct}); }catch(e2){ console.log('redirect token failed',e2); }
+    return null;
+  }
+}
+
+function doLogin(){
+  if(!msalApp){ showToast('App not configured yet'); return; }
+  msalApp.loginRedirect({scopes:GRAPH_SCOPES}).catch(function(e){
+    console.log('login error',e);
+    var err=document.getElementById('loginErr');
+    if(err){ err.style.display='block'; setTimeout(function(){ err.style.display='none'; },4000); }
+  });
+}
+
+function doLogout(){
+  if(!confirm('Sign out of Dolly Petroleum?')) return;
+  currentUser=null; currentRole=null; currentDisplayName=null;
+  if(msalApp) msalApp.logoutRedirect({postLogoutRedirectUri:window.location.origin+window.location.pathname});
+}
+
+function resolveRole(){
+  if(!currentUser) return;
+  var users=getUsers();
+  var m=users.find(function(u){ return (u.email||'').toLowerCase()===currentUser; });
+  if(m){ currentRole=m.role||'staff'; if(m.displayName) currentDisplayName=m.displayName; }
+  else if(!users.length){ currentRole='admin'; } // bootstrap: no roles configured yet
+  else { currentRole='staff'; }
+}
+
+function applyRoleUI(){
+  var allowed=ROLE_TABS[currentRole]||[0,1,2,3,4];
+  document.querySelectorAll('.bn').forEach(function(b,i){ b.style.display=allowed.indexOf(i)>=0?'':'none'; });
+  var tb=document.getElementById('tbUser');
+  if(tb) tb.innerHTML='<div class="tb-uname">'+escHtml(currentDisplayName)+'</div><div class="tb-urole">'+currentRole+'</div>';
+}
+
+function activateApp(account){
+  currentUser=(account.username||'').toLowerCase();
+  currentDisplayName=account.name||account.username;
+  resolveRole();
+  document.getElementById('loginOverlay').style.display='none';
+  applyRoleUI();
+  nav(0);
+  spSync.pull().then(function(){
+    resolveRole(); applyRoleUI();
+    if(curPage===5) renderSettings();
+    spSync.startAutoRefresh();
+  });
+}
+
+async function initAuth(){
+  if(AAD_CLIENT_ID.indexOf('__')===0){
+    document.getElementById('loginOverlay').style.display='flex';
+    var err=document.getElementById('loginErr');
+    if(err){ err.textContent='⚠ App not configured yet (missing Client ID)'; err.style.display='block'; }
+    return;
+  }
+  msalApp=new msal.PublicClientApplication({
+    auth:{
+      clientId:AAD_CLIENT_ID,
+      authority:'https://login.microsoftonline.com/'+AAD_TENANT,
+      redirectUri:window.location.origin+window.location.pathname
+    },
+    cache:{cacheLocation:'localStorage'}
+  });
+  await msalApp.initialize();
+  var resp=null;
+  try{ resp=await msalApp.handleRedirectPromise(); }catch(e){ console.log('redirect error',e); }
+  var acct=(resp&&resp.account)||msalApp.getActiveAccount()||msalApp.getAllAccounts()[0];
+  if(acct){ msalApp.setActiveAccount(acct); activateApp(acct); }
+  else { document.getElementById('loginOverlay').style.display='flex'; }
+}
+
+// ─── User Management (admin only, email-based roles) ─────────────
+function renderUserList(){
+  var users=getUsers();
+  document.getElementById('userList').innerHTML=users.length?users.map(function(u,i){
+    return '<div class="um-row">'+
+      '<div class="um-info"><div class="um-name">'+escHtml(u.displayName||u.email)+'</div>'+
+      '<div class="um-role">'+escHtml(u.email)+' · <span class="'+(u.role==='admin'?'info':'muted')+'">'+u.role+'</span></div></div>'+
+      '<button class="btn btn-red btn-sm" style="margin-left:6px" onclick="deleteUser('+i+')">✕</button>'+
+      '</div>';
+  }).join(''):'<p style="font-size:12px;color:var(--text3)">No roles configured yet — until the first person is added below, everyone who signs in is treated as admin. Add yourself (as admin) first, then your staff.</p>';
+}
+function deleteUser(idx){
+  var users=getUsers();
+  if(!confirm('Remove '+(users[idx].displayName||users[idx].email)+'?')) return;
+  users.splice(idx,1); saveUsersStore(users);
+  renderUserList(); showToast('✓ Removed');
+  resolveRole(); applyRoleUI();
+}
+function addUser(){
+  var email=(document.getElementById('nu-user').value||'').trim().toLowerCase();
+  var dn=(document.getElementById('nu-name').value||'').trim();
+  var role=document.getElementById('nu-role').value;
+  if(!email||email.indexOf('@')<1){ showToast('Enter a valid Microsoft account email'); return; }
+  if(!dn){ showToast('Enter display name'); return; }
+  var users=getUsers();
+  if(users.find(function(u){ return (u.email||'').toLowerCase()===email; })){ showToast('Email already added'); return; }
+  users.push({email:email,role:role,displayName:dn});
+  saveUsersStore(users);
+  document.getElementById('nu-user').value=''; document.getElementById('nu-name').value='';
+  renderUserList(); showToast('✓ '+dn+' added');
+  resolveRole(); applyRoleUI();
+}
+
+// ═══════════════════════════════════════ INIT ════════════════════
+document.addEventListener('DOMContentLoaded',function(){
+  loadData();
+  spSync.init();
+  initAuth();
+});
+</script>
+</body>
+</html>
