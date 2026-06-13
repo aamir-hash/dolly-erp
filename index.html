@@ -711,6 +711,7 @@ function submitEntry(){
   entries = entries.filter(function(x){ return x.date!==e.date; });
   entries.push(e);
   entries.sort(function(a,b){ return a.date.localeCompare(b.date); });
+  try{ e.reportText=reportText(e.date); }catch(err){}   // store send-ready report for email/WhatsApp automation
   saveEntries();
   draft={};curStep=0;
   showToast('✓ Entry saved for '+fmtDate(e.date));
@@ -1101,6 +1102,7 @@ function saveEditEntry(date){
   e.totalExp=e.expenses.reduce(function(s,x){ return s+(x.amount||0); },0);
   e.netProfit=e.totalMargin-e.totalExp;
   e.savedAt=new Date().toISOString();
+  try{ e.reportText=reportText(date); }catch(err){}
   saveEntries();
   showToast('✓ Saved changes for '+fmtDate(date));
   showDetail(date);
