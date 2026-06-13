@@ -797,8 +797,54 @@ function renderDailyReport(){
     '<div style="display:flex;align-items:center;gap:8px;margin-bottom:12px">'+
     '<input type="date" value="'+rptDate+'" max="'+todayStr()+'" style="flex:1;padding:10px 12px;border:1.5px solid var(--border);border-radius:9px;font-size:14px;font-family:var(--mono)" onchange="rptDate=this.value;renderDailyReport()"/>'+
     '</div>'+
-    (e ? dayDetailHTML(e) : '<div class="card" style="text-align:center;padding:32px"><p style="font-size:14px;font-weight:700;color:var(--text)">No entry for this date</p></div>');
+    (e ? (dayDetailHTML(e) + partyBalancesCard() +
+        '<div style="display:flex;gap:8px;margin-top:10px">'+
+        '<button class="btn btn-outline" style="flex:1" onclick="copyReport(\''+rptDate+'\')">📋 Copy report</button>'+
+        '<button class="btn btn-wa" style="flex:1" onclick="shareReportWA(\''+rptDate+'\')">🟢 WhatsApp</button></div>')
+      : '<div class="card" style="text-align:center;padding:32px"><p style="font-size:14px;font-weight:700;color:var(--text)">No entry for this date</p></div>');
 }
+
+// ── Daily report text + share (used in-app, and mirrored by the email/WhatsApp automation) ──
+function inrR(v){ if(v==null||isNaN(v)) return '—'; var a=Math.round(v); return (a<0?'-₹':'₹')+Math.abs(a).toLocaleString('en-IN'); }
+function partyBalancesCard(){
+  var rows=getParties().map(function(p){ var b=getPartyBalance(p.name); var cls=b>0?'warn':(b<0?'ok':'muted'); var lbl=b>0?'due':(b<0?'credit':'clear');
+    return '<div class="vrow"><span class="vl">'+escHtml(p.name)+'</span><span class="vv '+cls+'">'+inrR(Math.abs(b))+' '+lbl+'</span></div>'; }).join('');
+  return '<div class="card"><div class="card-title">🤝 Party Balances</div>'+rows+'</div>';
+}
+function reportText(date){
+  var e=entries.find(function(x){ return x.date===date&&x.submitted; });
+  if(!e) return 'No entry for '+fmtDate(date);
+  var L=[];
+  L.push('*DOLLY PETROLEUM — DAILY REPORT*');
+  L.push(fmtDate(date)+' ('+fmtDay(date)+') · By '+(e.reporter||'—'));
+  L.push('');
+  L.push('*SALES*');
+  L.push('HSD: '+fL(e.dSold)+' @ ₹'+e.dSell+' = '+inrR(e.dRev));
+  L.push('MS: '+fL(e.pSold)+' @ ₹'+e.pSell+' = '+inrR(e.pRev));
+  L.push('Revenue: '+inrR(e.totalRev));
+  L.push('');
+  L.push('*COLLECTIONS*');
+  L.push('Cash '+inrR(e.cash)+' · UPI '+inrR(e.upi)+' · Swipe '+inrR(e.swipe)+' · Fleet '+inrR(e.fleet));
+  L.push('Total collected: '+inrR(e.totalColl)+'  (variance '+inrR(e.cashVar)+')');
+  L.push('');
+  L.push('*PROFIT & EXPENSES*');
+  L.push('Gross margin: '+inrR(e.totalMargin));
+  L.push('Expenses: '+inrR(e.totalExp));
+  if(e.expenses&&e.expenses.length) L.push('  ('+e.expenses.map(function(x){ return x.name+' '+inrR(x.amount); }).join(', ')+')');
+  L.push('Net profit: '+inrR(e.netProfit));
+  var sf=[];
+  if(e.pAMvar!=null&&Math.abs(e.pAMvar)>=100) sf.push('MS 10AM var '+fL(e.pAMvar));
+  if(e.dAMvar!=null&&Math.abs(e.dAMvar)>=100) sf.push('HSD 10AM var '+fL(e.dAMvar));
+  if(e.pPMvar!=null&&Math.abs(e.pPMvar)>=100) sf.push('MS 10PM var '+fL(e.pPMvar));
+  if(e.dPMvar!=null&&Math.abs(e.dPMvar)>=100) sf.push('HSD 10PM var '+fL(e.dPMvar));
+  if(sf.length){ L.push(''); L.push('*⚠ STOCK ALERTS*'); L.push(sf.join(' · ')); }
+  L.push('');
+  L.push('*PARTY BALANCES*');
+  getParties().forEach(function(p){ var b=getPartyBalance(p.name); L.push(p.name+': '+(b>0?inrR(b)+' due':(b<0?inrR(-b)+' credit':'clear'))); });
+  return L.join('\n');
+}
+function copyReport(date){ var t=reportText(date); if(navigator.clipboard&&navigator.clipboard.writeText){ navigator.clipboard.writeText(t).then(function(){ showToast('✓ Report copied'); },function(){ alert(t); }); } else { alert(t); } }
+function shareReportWA(date){ window.open('https://wa.me/?text='+encodeURIComponent(reportText(date)),'_blank'); }
 
 // ── WEEKLY ────────────────────────────────────────────────────────
 var weekOffset=0;
@@ -1559,6 +1605,10 @@ function activateApp(account){
     maybeLock();
     if(curPage===5) renderSettings();
     spSync.startAutoRefresh();
+    // daily-report ping
+    var subm=entries.filter(function(x){ return x.submitted; }).sort(function(a,b){ return a.date.localeCompare(b.date); });
+    var last=subm[subm.length-1];
+    if(last) setTimeout(function(){ if(appUnlocked!==false||!settings.pinHash) showToast('📋 Daily report ready — '+fmtDate(last.date)+' (Reports tab)'); }, 1400);
   });
 }
 
