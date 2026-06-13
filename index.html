@@ -713,6 +713,7 @@ function submitEntry(){
   entries.sort(function(a,b){ return a.date.localeCompare(b.date); });
   try{ e.reportText=reportText(e.date); }catch(err){}   // store send-ready report for email/WhatsApp automation
   try{ e.reportHtml=reportHtml(e.date); }catch(err){}   // HTML table version for email
+  try{ var _dl=getDeleted(); if(_dl.indexOf(e.date)>=0){ saveDeleted(_dl.filter(function(x){ return x!==e.date; })); } }catch(err){}  // re-entering a date clears its tombstone
   saveEntries();
   draft={};curStep=0;
   showToast('✓ Entry saved for '+fmtDate(e.date));
@@ -1147,6 +1148,7 @@ function saveEditEntry(date){
   e.savedAt=new Date().toISOString();
   try{ e.reportText=reportText(date); }catch(err){}
   try{ e.reportHtml=reportHtml(date); }catch(err){}
+  try{ var _dl=getDeleted(); if(_dl.indexOf(date)>=0){ saveDeleted(_dl.filter(function(x){ return x!==date; })); } }catch(err){}
   saveEntries();
   showToast('✓ Saved changes for '+fmtDate(date));
   showDetail(date);
@@ -1460,13 +1462,9 @@ var spSync = {
       var data = await resp.json();
       var changed = false;
 
-      // merge deletion tombstones from cloud, then purge any deleted entries locally
-      if(data.deletedDates && data.deletedDates.length){
-        var del=getDeleted();
-        data.deletedDates.forEach(function(d){ if(del.indexOf(d)<0) del.push(d); });
-        saveDeleted(del);
-      }
-      var deletedSet = getDeleted();
+      // cloud is the source of truth for deletion tombstones, so BOTH deletes and re-entries propagate
+      var deletedSet = data.deletedDates || [];
+      saveDeleted(deletedSet);
       if(deletedSet.length){
         var preLen=entries.length;
         entries=entries.filter(function(e){ return deletedSet.indexOf(e.date)<0; });
