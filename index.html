@@ -957,8 +957,84 @@ function showDetail(date){
     '<div class="modal-title">'+fmtDate(e.date)+' · '+fmtDay(e.date)+'</div>'+
     '<button onclick="closeModal()" style="background:var(--border);border:none;border-radius:8px;padding:6px 12px;cursor:pointer;font-size:13px">✕ Close</button></div>'+
     dayDetailHTML(e)+
-    (e.type==='daily'?'<button class="btn btn-outline" onclick="loadForEdit(\''+e.date+'\')">✏️ Edit this entry</button>':'');
+    '<div style="display:flex;gap:8px;margin-top:12px">'+
+    '<button class="btn btn-outline" style="flex:1" onclick="openEditEntry(\''+e.date+'\')">✏️ Edit values</button>'+
+    (e.type==='daily'?'<button class="btn btn-outline" style="flex:1" onclick="loadForEdit(\''+e.date+'\')">🔢 Edit via nozzles</button>':'')+
+    '</div>'+
+    '<button class="btn" style="background:#dc2626;color:#fff;margin-top:8px" onclick="deleteEntry(\''+e.date+'\')">🗑 Delete this entry</button>';
   document.getElementById('detailModal').classList.remove('hidden');
+}
+
+// ── Deletion tombstones (so deletes sync across devices) ──
+var SK_DELETED='dp_deleted_v1';
+function getDeleted(){ try{ var d=localStorage.getItem(SK_DELETED); if(d) return JSON.parse(d); }catch(e){} return []; }
+function saveDeleted(d){ try{ localStorage.setItem(SK_DELETED,JSON.stringify(d)); }catch(e){} }
+
+function deleteEntry(date){
+  if(!confirm('Delete the entry for '+fmtDate(date)+'? This removes it everywhere and cannot be undone from the app.')) return;
+  var del=getDeleted(); if(del.indexOf(date)<0){ del.push(date); saveDeleted(del); }
+  entries = entries.filter(function(x){ return x.date!==date; });
+  saveEntries();
+  closeModal();
+  showToast('✓ Entry deleted for '+fmtDate(date));
+  nav(4);
+}
+
+// ── Universal value editor (works for daily AND imported entries) ──
+function openEditEntry(date){
+  var e=entries.find(function(x){ return x.date===date; });
+  if(!e) return;
+  draft=JSON.parse(JSON.stringify(e));
+  if(!draft.expenses) draft.expenses=[];
+  function fld(label,id,val,step){ return '<div class="field"><label>'+label+'</label><input type="number" step="'+(step||'0.01')+'" id="ed-'+id+'" value="'+(val!=null?val:'')+'"/></div>'; }
+  var expHtml=draft.expenses.map(function(x,i){
+    return '<div class="exp-item" style="gap:6px"><input id="ede-name-'+i+'" value="'+(x.name||'').replace(/"/g,'&quot;')+'" style="flex:1;padding:6px;border:1px solid var(--border);border-radius:6px;font-size:12px"/>'+
+      '<input id="ede-amt-'+i+'" type="number" step="0.01" value="'+(x.amount||0)+'" style="width:90px;padding:6px;border:1px solid var(--border);border-radius:6px;font-size:12px"/>'+
+      '<button onclick="editDelExp('+i+')" style="background:#fee;border:none;border-radius:6px;padding:6px 9px;cursor:pointer">✕</button></div>';
+  }).join('');
+  document.getElementById('detailContent').innerHTML=
+    '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">'+
+    '<div class="modal-title">Edit · '+fmtDate(e.date)+(e.type==='import'?' (imported)':'')+'</div>'+
+    '<button onclick="showDetail(\''+date+'\')" style="background:var(--border);border:none;border-radius:8px;padding:6px 12px;cursor:pointer;font-size:13px">‹ Back</button></div>'+
+    '<div class="card"><div class="card-title">⛽ Sales</div>'+
+    fld('HSD sold (L)','dSold',e.dSold)+fld('HSD sell ₹/L','dSell',e.dSell)+fld('HSD cost ₹/L','dCost',e.dCost!=null?e.dCost:e.dBuy)+
+    fld('MS sold (L)','pSold',e.pSold)+fld('MS sell ₹/L','pSell',e.pSell)+fld('MS cost ₹/L','pCost',e.pCost!=null?e.pCost:e.pBuy)+'</div>'+
+    '<div class="card"><div class="card-title">💳 Collections</div>'+
+    fld('Cash','cash',e.cash)+fld('UPI / PhonePe','upi',e.upi)+fld('Swipe','swipe',e.swipe)+fld('Fleet / Credit','fleet',e.fleet)+
+    '<p style="font-size:11px;color:var(--text3);margin-top:4px">Note: editing the Fleet total here does not reassign per-party credit.</p></div>'+
+    '<div class="card"><div class="card-title">💸 Expenses</div><div id="ed-exps">'+expHtml+'</div>'+
+    '<button class="btn btn-outline btn-sm" style="margin-top:8px" onclick="editAddExp()">+ Add expense</button></div>'+
+    '<button class="btn" style="background:var(--blue);color:#fff;margin-top:6px" onclick="saveEditEntry(\''+date+'\')">💾 Save changes</button>';
+  document.getElementById('detailModal').classList.remove('hidden');
+}
+function editDelExp(i){ readEditExps(); draft.expenses.splice(i,1); openEditEntry(draft.date); }
+function editAddExp(){ readEditExps(); draft.expenses.push({name:'',amount:0,dept:'OFFICE EXPENSES'}); openEditEntry(draft.date); }
+function readEditExps(){
+  var box=document.getElementById('ed-exps'); if(!box) return;
+  (draft.expenses||[]).forEach(function(x,i){
+    var n=document.getElementById('ede-name-'+i), a=document.getElementById('ede-amt-'+i);
+    if(n) x.name=n.value; if(a) x.amount=parseFloat(a.value)||0;
+  });
+}
+function saveEditEntry(date){
+  var e=entries.find(function(x){ return x.date===date; }); if(!e) return;
+  readEditExps();
+  function g(id){ var el=document.getElementById('ed-'+id); var v=el?parseFloat(el.value):NaN; return isNaN(v)?0:v; }
+  e.dSold=g('dSold'); e.dSell=g('dSell'); e.dCost=g('dCost'); e.dBuy=e.dCost;
+  e.pSold=g('pSold'); e.pSell=g('pSell'); e.pCost=g('pCost'); e.pBuy=e.pCost;
+  e.cash=g('cash'); e.upi=g('upi'); e.swipe=g('swipe'); e.fleet=g('fleet');
+  e.expenses=(draft.expenses||[]).filter(function(x){ return x.name&&x.amount; });
+  // recompute derived totals (no nozzle baseline — safe for imported entries)
+  e.dRev=e.dSold*e.dSell; e.pRev=e.pSold*e.pSell; e.totalRev=e.dRev+e.pRev;
+  e.dMargin=e.dSold*(e.dSell-e.dCost); e.pMargin=e.pSold*(e.pSell-e.pCost); e.totalMargin=e.dMargin+e.pMargin;
+  e.totalColl=(e.cash||0)+(e.upi||0)+(e.swipe||0)+(e.fleet||0);
+  e.cashVar=e.totalColl-e.totalRev;
+  e.totalExp=e.expenses.reduce(function(s,x){ return s+(x.amount||0); },0);
+  e.netProfit=e.totalMargin-e.totalExp;
+  e.savedAt=new Date().toISOString();
+  saveEntries();
+  showToast('✓ Saved changes for '+fmtDate(date));
+  showDetail(date);
 }
 function closeModal(evt){ if(!evt||evt.target===document.getElementById('detailModal')) document.getElementById('detailModal').classList.add('hidden'); }
 function loadForEdit(date){
@@ -1263,9 +1339,23 @@ var spSync = {
       var data = await resp.json();
       var changed = false;
 
+      // merge deletion tombstones from cloud, then purge any deleted entries locally
+      if(data.deletedDates && data.deletedDates.length){
+        var del=getDeleted();
+        data.deletedDates.forEach(function(d){ if(del.indexOf(d)<0) del.push(d); });
+        saveDeleted(del);
+      }
+      var deletedSet = getDeleted();
+      if(deletedSet.length){
+        var preLen=entries.length;
+        entries=entries.filter(function(e){ return deletedSet.indexOf(e.date)<0; });
+        if(entries.length!==preLen){ changed=true; try{ localStorage.setItem(SK, JSON.stringify(entries)); }catch(ex){} }
+      }
+
       if(data.entries && data.entries.length){
         var localDates = entries.map(function(e){ return e.date; });
         data.entries.forEach(function(e){
+          if(deletedSet.indexOf(e.date)>=0){ return; } // don't resurrect deleted entries
           if(localDates.indexOf(e.date)<0){
             entries.push(e); changed=true;
           } else {
@@ -1326,6 +1416,7 @@ var spSync = {
         parties: getParties(),
         payments: getPayments(),
         users: getUsers(),
+        deletedDates: getDeleted(),
         lastUpdated: new Date().toISOString(),
         updatedBy: currentDisplayName||'unknown'
       });
