@@ -195,6 +195,18 @@ tr.hi-row td{background:rgba(255,220,2,.06)}
   </div>
 </div>
 
+<div class="login-overlay" id="pinOverlay" style="display:none">
+  <div class="login-card">
+    <div class="login-logo">🔒</div>
+    <div class="login-title">Enter PIN</div>
+    <div class="login-sub">Dolly Petroleum · Locked</div>
+    <div class="login-err" id="pinErr">❌ Wrong PIN — try again</div>
+    <input id="pinInput" type="password" inputmode="numeric" autocomplete="off" maxlength="6" placeholder="••••" style="width:100%;text-align:center;font-size:28px;letter-spacing:10px;padding:12px;border:1.5px solid var(--border);border-radius:10px;margin-bottom:14px;font-family:var(--mono)" onkeydown="if(event.key==='Enter')verifyPin()"/>
+    <button class="btn btn-blue" onclick="verifyPin()" style="font-size:16px">Unlock</button>
+    <button class="btn btn-outline btn-sm" style="margin-top:8px" onclick="doLogout()">Sign out instead</button>
+  </div>
+</div>
+
 <div class="topbar">
   <div class="tb-left">
     <div class="tb-logo">DP</div>
@@ -309,6 +321,17 @@ tr.hi-row td{background:rgba(255,220,2,.06)}
       <button class="btn btn-outline btn-sm" style="width:auto;padding:10px 18px" onclick="spSync.pull().then(renderSettings)">⟳ Pull Now</button>
       <button class="btn btn-outline btn-sm" style="width:auto;padding:10px 18px" onclick="spSync.push().then(renderSettings)">↑ Push Now</button>
     </div>
+  </div>
+  <div class="card" id="pinLockCard">
+    <div class="card-title">🔒 App PIN Lock</div>
+    <div id="pinStatus" class="alert alert-b" style="margin-bottom:10px;font-size:12px">—</div>
+    <p style="font-size:11px;color:var(--text3);margin-bottom:8px">A PIN is required each time the app is opened, on top of Microsoft sign-in. Applies to everyone and syncs across devices.</p>
+    <div style="display:flex;gap:8px;flex-wrap:wrap">
+      <button class="btn btn-blue btn-sm" style="width:auto;padding:10px 18px" onclick="setPin()">Set / Change PIN</button>
+      <button class="btn btn-outline btn-sm" style="width:auto;padding:10px 18px" onclick="removePin()">Remove PIN</button>
+      <button class="btn btn-outline btn-sm" style="width:auto;padding:10px 18px" onclick="lockNow()">Lock now</button>
+    </div>
+    <div class="field" style="margin-top:10px"><label>Auto-lock after inactivity (minutes · 0 = off)</label><input type="number" id="s-idleLock" min="0" step="1" onchange="setIdleLock(this.value)"/></div>
   </div>
   <div class="card" id="userMgmtCard">
     <div class="card-title">👥 User Management</div>
@@ -1068,6 +1091,12 @@ function renderSettings(){
   var umc=document.getElementById('userMgmtCard');
   if(currentRole==='admin'){ umc.style.display=''; renderUserList(); }
   else { umc.style.display='none'; }
+  // PIN lock card (admin only)
+  var pinCard=document.getElementById('pinLockCard');
+  if(pinCard) pinCard.style.display=(currentRole==='admin')?'':'none';
+  var pinStat=document.getElementById('pinStatus');
+  if(pinStat){ pinStat.className='alert '+(settings.pinHash?'alert-g':'alert-b'); pinStat.textContent=settings.pinHash?'✓ PIN lock is ON — required on each open':'PIN lock is OFF — set a PIN to enable'; }
+  var idle=document.getElementById('s-idleLock'); if(idle) idle.value=settings.idleLockMin||0;
 }
 
 function exportBackup(){
@@ -1524,12 +1553,49 @@ function activateApp(account){
   document.getElementById('loginOverlay').style.display='none';
   applyRoleUI();
   nav(0);
+  if(settings.pinHash){ showPinLock(); }   // lock immediately using cached PIN (re-confirmed after pull)
   spSync.pull().then(function(){
     resolveRole(); applyRoleUI();
+    maybeLock();
     if(curPage===5) renderSettings();
     spSync.startAutoRefresh();
   });
 }
+
+// ─── App PIN lock (on top of Microsoft sign-in) ───
+var appUnlocked=false, _idleTimer=null;
+async function sha256hex(s){ var b=await crypto.subtle.digest('SHA-256', new TextEncoder().encode(s)); return Array.from(new Uint8Array(b)).map(function(x){ return x.toString(16).padStart(2,'0'); }).join(''); }
+function showPinLock(){ var o=document.getElementById('pinOverlay'); if(o){ o.style.display='flex'; var i=document.getElementById('pinInput'); if(i){ i.value=''; setTimeout(function(){ try{ i.focus(); }catch(e){} },150); } } }
+function hidePinLock(){ var o=document.getElementById('pinOverlay'); if(o) o.style.display='none'; }
+async function verifyPin(){
+  var el=document.getElementById('pinInput'); var v=((el&&el.value)||'').trim(); if(!v) return;
+  var h=await sha256hex(v);
+  if(settings.pinHash && h===settings.pinHash){ appUnlocked=true; hidePinLock(); resetIdle(); }
+  else { var e=document.getElementById('pinErr'); if(e){ e.style.display='block'; setTimeout(function(){ e.style.display='none'; },2500); } if(el) el.value=''; }
+}
+function maybeLock(){ if(settings.pinHash){ if(!appUnlocked) showPinLock(); } else { appUnlocked=true; hidePinLock(); } }
+function resetIdle(){ clearTimeout(_idleTimer); var m=parseInt(settings.idleLockMin||0,10); if(m>0 && settings.pinHash){ _idleTimer=setTimeout(function(){ appUnlocked=false; showPinLock(); }, m*60000); } }
+['click','keydown','touchstart','mousemove','scroll'].forEach(function(ev){ document.addEventListener(ev, function(){ if(appUnlocked) resetIdle(); }, {passive:true}); });
+async function setPin(){
+  var p1=prompt('Set a 4–6 digit app PIN:'); if(p1===null) return; p1=(p1||'').trim();
+  if(!/^[0-9]{4,6}$/.test(p1)){ showToast('PIN must be 4–6 digits'); return; }
+  var p2=prompt('Re-enter the PIN to confirm:'); if(p2===null) return;
+  if(p1!==(p2||'').trim()){ showToast('PINs do not match'); return; }
+  settings.pinHash=await sha256hex(p1); appUnlocked=true;
+  try{ localStorage.setItem(SS,JSON.stringify(settings)); }catch(e){}
+  if(typeof spSync!=='undefined'&&spSync.active) spSync.schedulePush();
+  showToast('✓ App PIN set'); renderSettings();
+}
+function removePin(){
+  if(!settings.pinHash){ showToast('No PIN set'); return; }
+  if(!confirm('Remove the app PIN lock for everyone?')) return;
+  settings.pinHash='';
+  try{ localStorage.setItem(SS,JSON.stringify(settings)); }catch(e){}
+  if(typeof spSync!=='undefined'&&spSync.active) spSync.schedulePush();
+  appUnlocked=true; hidePinLock(); showToast('✓ PIN removed'); renderSettings();
+}
+function setIdleLock(v){ settings.idleLockMin=parseInt(v,10)||0; try{ localStorage.setItem(SS,JSON.stringify(settings)); }catch(e){} if(typeof spSync!=='undefined'&&spSync.active) spSync.schedulePush(); resetIdle(); }
+function lockNow(){ if(!settings.pinHash){ showToast('Set a PIN first'); return; } appUnlocked=false; showPinLock(); }
 
 async function initAuth(){
   if(AAD_CLIENT_ID.indexOf('__')===0){
