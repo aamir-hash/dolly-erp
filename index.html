@@ -600,11 +600,18 @@ function saveDraft2(){
 
 function stepCollections(){
   function ci(id,label,val){ return '<div class="field"><label>'+label+'</label><input type="number" id="e-'+id+'" step="0.01" value="'+(val==null||isNaN(val)?'':val)+'" placeholder="0"/></div>'; }
+  var _parties=getParties(); var _fb=draft.fleetBreakdown||{};
+  var _fleetRows=_parties.map(function(p,i){ var v=_fb[p.name];
+    return '<div class="field"><label>'+escHtml(p.name)+' (₹)</label><input type="number" id="e-fleetp-'+i+'" step="0.01" value="'+(v==null||isNaN(v)?'':v)+'" placeholder="0" oninput="updFleetTotal()"/></div>'; }).join('');
   return '<div class="card"><div class="card-title">💳 Step 4 — Collections</div>'+
     '<div class="grid2">'+
     ci('cash','Cash (₹)',draft.cash)+ci('upi','UPI / PhonePe (₹)',draft.upi)+
-    ci('swipe','Swipe Card (₹)',draft.swipe)+ci('fleet','Fleet Card (₹)',draft.fleet)+
+    ci('swipe','Swipe Card (₹)',draft.swipe)+
     '</div></div>'+
+    '<div class="card"><div class="card-title">🚛 Credit Sales by Party</div>'+
+    '<div class="alert alert-b" style="font-size:11px;margin-bottom:10px">Enter diesel value given on credit to each party today — this updates their ledger automatically. Leave blank if none.</div>'+
+    '<div class="grid2">'+_fleetRows+'</div>'+
+    '<div class="vrow"><span class="vl" style="font-weight:700">Total credit (fleet)</span><span class="vv" id="fleetTotalLbl">'+inr(draft.fleet||0)+'</span></div></div>'+
     '<div class="card"><div class="card-title">🚛 Tanker Delivery (if any)</div>'+
     '<div class="alert alert-b" style="margin-bottom:10px;font-size:11px">Enter litres received from tanker today. Leave 0 if no delivery.</div>'+
     '<div class="grid2">'+
@@ -621,10 +628,14 @@ function stepCollections(){
     '<button class="btn btn-blue" style="flex:1" onclick="saveDraft3();goStep(4)">Next — Expenses →</button></div>';
 }
 function saveDraft3(){
-  ['cash','upi','swipe','fleet','pRcvd','pBuy','dRcvd','dBuy','pSell','dSell'].forEach(function(k){
+  ['cash','upi','swipe','pRcvd','pBuy','dRcvd','dBuy','pSell','dSell'].forEach(function(k){
     var el=document.getElementById('e-'+k); if(el){ var v=parseFloat(el.value); draft[k]=isNaN(v)?0:v; }
   });
+  var _parties=getParties(); var _fb={}; var _tot=0;
+  _parties.forEach(function(p,i){ var el=document.getElementById('e-fleetp-'+i); if(el){ var v=parseFloat(el.value); if(!isNaN(v)&&v!==0){ _fb[p.name]=v; _tot+=v; } } });
+  draft.fleetBreakdown=_fb; draft.fleet=_tot;
 }
+function updFleetTotal(){ var ps=getParties(); var t=0; ps.forEach(function(p,i){ var el=document.getElementById('e-fleetp-'+i); if(el){ var v=parseFloat(el.value); if(!isNaN(v)) t+=v; } }); var lbl=document.getElementById('fleetTotalLbl'); if(lbl) lbl.textContent=inr(t); }
 
 if(!draft.expenses) draft.expenses=[];
 function stepExpenses(){
