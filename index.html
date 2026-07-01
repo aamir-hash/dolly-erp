@@ -409,7 +409,11 @@ function nozzleTotal(e,keys){ if(!e) return 0; return keys.reduce(function(s,k){
 // Price per litre used to value a party's CREDIT diesel: Mohd Aamir Transport at COST
 // (the "AAMIR at cost" rule), every other party at its saved HSD rate (fallback: day's sell rate).
 function creditRate(partyName, e){
-  if(partyName==='AAMIR TRANSPORT') return (e&&e.dCost)||settings.rates.dBuy||0;
+  if(partyName==='AAMIR TRANSPORT') return (e&&e.dCost)||settings.rates.dBuy||0; // always at cost
+  // other parties: use the rate Shiban entered for the day (credit rates run higher), else saved rate
+  if(e&&e.fleetRateBreakdown&&e.fleetRateBreakdown[partyName]!=null&&e.fleetRateBreakdown[partyName]!==''){
+    var r=parseFloat(e.fleetRateBreakdown[partyName]); if(!isNaN(r)&&r>0) return r;
+  }
   var p=getParties().find(function(x){ return x.name===partyName; });
   return (p&&p.hsdRate)||(e&&e.dSell)||settings.rates.dSell||0;
 }
@@ -451,20 +455,27 @@ function computeEntry(e){
   e.pPMvar = (e.pPM!=null&&e.pAutoPM!=null) ? e.pPM-e.pAutoPM : null;
   e.dPMvar = (e.dPM!=null&&e.dAutoPM!=null) ? e.dPM-e.dAutoPM : null;
   // Per-party CREDIT is captured in LITRES; convert to ₹ using each party's price:
-  // Mohd Aamir Transport is billed at COST (dCost), every other party at its saved rate.
+  // Mohd Aamir Transport is billed at COST (dCost), every other party at Shiban's entered rate.
+  // creditAdj re-values those litres from the retail sell rate to their billed rate, so both
+  // revenue and gross margin reflect reality (Aamir contributes zero margin, others their rate).
+  e.creditAdj=0;
   if(e.fleetLitresBreakdown){
-    var _fbR={}, _tot=0, _ps=getParties();
+    var _fbR={}, _tot=0, _adj=0;
     Object.keys(e.fleetLitresBreakdown).forEach(function(pn){
       var lit=parseFloat(e.fleetLitresBreakdown[pn])||0; if(!lit) return;
       var rate=creditRate(pn,e);
       var val=Math.round(lit*rate*100)/100; _fbR[pn]=val; _tot+=val;
+      _adj += lit*(rate - (e.dSell||0));
     });
-    e.fleetBreakdown=_fbR; e.fleet=Math.round(_tot*100)/100;
+    e.fleetBreakdown=_fbR; e.fleet=Math.round(_tot*100)/100; e.creditAdj=Math.round(_adj*100)/100;
   }
   // Collections
   e.totalColl = (e.cash||0)+(e.upi||0)+(e.swipe||0)+(e.fleet||0);
-  e.cashVar = e.totalColl - e.totalRev;
   e.totalExp = (e.expenses||[]).reduce(function(s,x){ return s+(x.amount||0); },0);
+  // Apply the credit re-valuation to revenue + margin (retail litres stay at retail).
+  e.totalRev = e.totalRev + e.creditAdj;
+  e.totalMargin = e.totalMargin + e.creditAdj;
+  e.cashVar = e.totalColl - e.totalRev;
   e.netProfit = e.totalMargin - e.totalExp;
   return e;
 }
@@ -630,9 +641,17 @@ function saveDraft2(){
 
 function stepCollections(){
   function ci(id,label,val){ return '<div class="field"><label>'+label+'</label><input type="number" id="e-'+id+'" step="0.01" value="'+(val==null||isNaN(val)?'':val)+'" placeholder="0"/></div>'; }
-  var _parties=getParties(); var _fl=draft.fleetLitresBreakdown||{};
-  var _fleetRows=_parties.map(function(p,i){ var v=_fl[p.name];
-    return '<div class="field"><label>'+escHtml(p.name)+' (L)</label><input type="number" id="e-fleetp-'+i+'" step="0.01" value="'+(v==null||isNaN(v)?'':v)+'" placeholder="0" oninput="updFleetTotal()"/></div>'; }).join('');
+  var _parties=getParties(); var _fl=draft.fleetLitresBreakdown||{}; var _fr=draft.fleetRateBreakdown||{};
+  var _fleetRows=_parties.map(function(p,i){
+    var lv=_fl[p.name]; var isA=(p.name==='AAMIR TRANSPORT');
+    var rv = isA ? '' : (_fr[p.name]!=null&&_fr[p.name]!==''?_fr[p.name]:(p.hsdRate||''));
+    return '<div style="margin-bottom:8px"><div style="font-size:12px;font-weight:700;color:var(--text2);margin-bottom:3px">'+escHtml(p.name)+(isA?' · at cost':'')+'</div>'+
+      '<div class="grid2">'+
+      '<div class="field" style="margin:0"><input type="number" id="e-fleetp-'+i+'" step="0.01" value="'+(lv==null||isNaN(lv)?'':lv)+'" placeholder="Litres" oninput="updFleetTotal()"/></div>'+
+      (isA? '<div class="field" style="margin:0"><input type="text" value="@ cost" disabled style="background:#f5f5f5;color:var(--text3);text-align:center"/></div>'
+          : '<div class="field" style="margin:0"><input type="number" id="e-fleetr-'+i+'" step="0.01" value="'+rv+'" placeholder="Rate ₹/L" oninput="updFleetTotal()"/></div>')+
+      '</div></div>';
+  }).join('');
   var _iL=0,_iR=0; Object.keys(_fl).forEach(function(pn){ var l=parseFloat(_fl[pn])||0; _iL+=l; _iR+=l*creditRate(pn,draft); });
   return '<div class="card"><div class="card-title">💳 Step 4 — Collections</div>'+
     '<div class="grid2">'+
@@ -640,8 +659,8 @@ function stepCollections(){
     ci('swipe','Swipe Card (₹)',draft.swipe)+
     '</div></div>'+
     '<div class="card"><div class="card-title">🚛 Credit Sales by Party</div>'+
-    '<div class="alert alert-b" style="font-size:11px;margin-bottom:10px">Enter diesel <b>litres</b> given on credit to each party today — the ₹ value is calculated automatically (Aamir Transport at cost price, others at their rate). Leave blank if none.</div>'+
-    '<div class="grid2">'+_fleetRows+'</div>'+
+    '<div class="alert alert-b" style="font-size:11px;margin-bottom:10px">Enter diesel <b>litres</b> given on credit to each party. Aamir Transport is billed at <b>cost</b> automatically; for the others enter the <b>rate ₹/L</b> (defaults to their usual rate — change it if today\'s credit rate is different). Leave blank if none.</div>'+
+    _fleetRows+
     '<div class="vrow"><span class="vl" style="font-weight:700">Total credit</span><span class="vv" id="fleetTotalLbl">'+(Math.round(_iL*10)/10)+' L ≈ '+inr(_iR)+'</span></div></div>'+
     '<div class="card"><div class="card-title">🚛 Tanker Delivery (if any)</div>'+
     '<div class="alert alert-b" style="margin-bottom:10px;font-size:11px">Enter litres received from tanker today. Leave 0 if no delivery.</div>'+
@@ -662,15 +681,25 @@ function saveDraft3(){
   ['cash','upi','swipe','pRcvd','pBuy','dRcvd','dBuy','pSell','dSell'].forEach(function(k){
     var el=document.getElementById('e-'+k); if(el){ var v=parseFloat(el.value); draft[k]=isNaN(v)?0:v; }
   });
-  var _parties=getParties(); var _fl={};
-  _parties.forEach(function(p,i){ var el=document.getElementById('e-fleetp-'+i); if(el){ var v=parseFloat(el.value); if(!isNaN(v)&&v!==0){ _fl[p.name]=v; } } });
-  draft.fleetLitresBreakdown=_fl;
+  var _parties=getParties(); var _fl={}, _fr={};
+  _parties.forEach(function(p,i){
+    var el=document.getElementById('e-fleetp-'+i); if(el){ var v=parseFloat(el.value); if(!isNaN(v)&&v!==0){ _fl[p.name]=v; } }
+    var er=document.getElementById('e-fleetr-'+i); if(er){ var rv=parseFloat(er.value); if(!isNaN(rv)&&rv>0){ _fr[p.name]=rv; } }
+  });
+  draft.fleetLitresBreakdown=_fl; draft.fleetRateBreakdown=_fr;
   // provisional ₹ (computeEntry finalizes using the day's actual cost)
   var _fb={}, _tot=0;
   Object.keys(_fl).forEach(function(pn){ var val=Math.round(_fl[pn]*creditRate(pn,draft)*100)/100; _fb[pn]=val; _tot+=val; });
   draft.fleetBreakdown=_fb; draft.fleet=Math.round(_tot*100)/100;
 }
-function updFleetTotal(){ var ps=getParties(); var tL=0,tR=0; ps.forEach(function(p,i){ var el=document.getElementById('e-fleetp-'+i); if(el){ var v=parseFloat(el.value); if(!isNaN(v)){ tL+=v; tR+=v*creditRate(p.name,draft); } } }); var lbl=document.getElementById('fleetTotalLbl'); if(lbl) lbl.textContent=(Math.round(tL*10)/10)+' L ≈ '+inr(tR); }
+function updFleetTotal(){
+  var ps=getParties(); var tL=0,tR=0;
+  // capture entered rates into draft so creditRate() sees them live
+  draft.fleetRateBreakdown=draft.fleetRateBreakdown||{};
+  ps.forEach(function(p,i){ var er=document.getElementById('e-fleetr-'+i); if(er){ var rv=parseFloat(er.value); if(!isNaN(rv)&&rv>0) draft.fleetRateBreakdown[p.name]=rv; } });
+  ps.forEach(function(p,i){ var el=document.getElementById('e-fleetp-'+i); if(el){ var v=parseFloat(el.value); if(!isNaN(v)){ tL+=v; tR+=v*creditRate(p.name,draft); } } });
+  var lbl=document.getElementById('fleetTotalLbl'); if(lbl) lbl.textContent=(Math.round(tL*10)/10)+' L ≈ '+inr(tR);
+}
 
 if(!draft.expenses) draft.expenses=[];
 function stepExpenses(){
