@@ -1603,6 +1603,15 @@ var spSync = {
       var data = await resp.json();
       var changed = false;
 
+      // Cache the nightly reconCheck health fields so push() can write them back (push does a
+      // blind full-file PUT and would otherwise wipe them on any entry save). Only overwrite the
+      // cache when the file actually carries the field, so a transient absence can't blank it.
+      try{
+        if('reconCheckStatus' in data || 'reconCheck' in data){
+          localStorage.setItem('dp_recon_v1', JSON.stringify({reconCheck:data.reconCheck||null, reconCheckStatus:data.reconCheckStatus||null, reconCheckSummary:data.reconCheckSummary||null}));
+        }
+      }catch(ex){}
+
       // cloud is the source of truth for deletion tombstones, so BOTH deletes and re-entries propagate
       var deletedSet = data.deletedDates || [];
       saveDeleted(deletedSet);
@@ -1690,6 +1699,10 @@ var spSync = {
       var _ym = _pm.getFullYear()+'-'+String(_pm.getMonth()+1).padStart(2,'0');
       var _mon = new Date(_t); _mon.setDate(_t.getDate() - (((_t.getDay()+6)%7) + 7));
       var _ws = _mon.getFullYear()+'-'+String(_mon.getMonth()+1).padStart(2,'0')+'-'+String(_mon.getDate()).padStart(2,'0');
+      // Preserve the nightly reconCheck health fields across a blind full-file PUT.
+      // pull() caches them in dp_recon_v1; write them back so an entry-save can't wipe
+      // reconCheckStatus/Summary before the morning alert flow reads them.
+      var _rc={}; try{ _rc=JSON.parse(localStorage.getItem('dp_recon_v1')||'{}'); }catch(ex){}
       var payload = JSON.stringify({
         entries: entries,
         settings: settings,
@@ -1701,6 +1714,9 @@ var spSync = {
         lastWeekReportHtml: weekReportHtml(_ws),
         lastMonthYm: _ym,
         lastWeekStart: _ws,
+        reconCheck: _rc.reconCheck||null,
+        reconCheckStatus: _rc.reconCheckStatus||null,
+        reconCheckSummary: _rc.reconCheckSummary||null,
         lastUpdated: new Date().toISOString(),
         updatedBy: currentDisplayName||'unknown'
       });
