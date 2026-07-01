@@ -254,6 +254,7 @@ tr.hi-row td{background:rgba(255,220,2,.06)}
     <button class="rtab" onclick="rTab(2,this)">Monthly</button>
     <button class="rtab" onclick="rTab(3,this)">All-time</button>
     <button class="rtab" onclick="rTab(4,this)">🔍 Check</button>
+    <button class="rtab" onclick="rTab(5,this)">🏦 Reconcile</button>
   </div>
   <div id="reportContent"></div>
 </div>
@@ -909,7 +910,109 @@ function renderReport(tab){
   else if(tab===1) renderWeeklyReport();
   else if(tab===2) renderMonthlyReport();
   else if(tab===4) renderCheckReport();
+  else if(tab===5) renderReconcile();
   else renderAllTime();
+}
+
+// ── STATEMENT RECONCILIATION (upload BPCL / bank) ─────────────────
+function loadScriptOnce(src){ return new Promise(function(res,rej){ if(document.querySelector('script[src="'+src+'"]')){ res(); return; } var s=document.createElement('script'); s.src=src; s.onload=function(){ res(); }; s.onerror=function(){ rej(new Error('load fail '+src)); }; document.head.appendChild(s); }); }
+async function ensurePdfJs(){ await loadScriptOnce('https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js'); if(window.pdfjsLib){ window.pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js'; } }
+async function ensureXlsx(){ await loadScriptOnce('https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js'); }
+
+// Extract text lines from a PDF (rows reconstructed by y-position)
+async function pdfToLines(arrayBuffer){
+  await ensurePdfJs();
+  var pdf=await window.pdfjsLib.getDocument({data:arrayBuffer}).promise;
+  var allLines=[];
+  for(var p=1;p<=pdf.numPages;p++){
+    var page=await pdf.getPage(p);
+    var tc=await page.getTextContent();
+    var rows={};
+    tc.items.forEach(function(it){ if(!it.str.trim()) return; var y=Math.round(it.transform[5]); var key=y; (rows[key]=rows[key]||[]).push({x:it.transform[4],s:it.str}); });
+    Object.keys(rows).map(Number).sort(function(a,b){ return b-a; }).forEach(function(y){
+      var line=rows[y].sort(function(a,b){ return a.x-b.x; }).map(function(i){ return i.s; }).join(' ').replace(/\s+/g,' ').trim();
+      if(line) allLines.push(line);
+    });
+  }
+  return allLines;
+}
+
+// Parse a BPCL "Statement of Account" into categorised entries
+function parseBpclLines(lines){
+  var out={period:'', opening:null, closing:null, rows:[], cat:{invoice:0,charge:0,bankPay:0,matTransfer:0,discount:0,other:0}, counts:{invoice:0,charge:0,bankPay:0,matTransfer:0,discount:0,other:0}};
+  lines.forEach(function(L){
+    var pm=L.match(/Period\s+(.+?\d{4}\s*-\s*.+?\d{4})/i); if(pm) out.period=pm[1];
+    var om=L.match(/OPENING BALAN[^\d]*([\d,]+\.\d{2})/i); if(om) out.opening=parseFloat(om[1].replace(/,/g,''));
+    var cm=L.match(/CLOSING BALAN.*?([\d,]+\.\d{2})\s*$/i); if(cm) out.closing=parseFloat(cm[1].replace(/,/g,''));
+    // data row: ends with amount + 1400 + doc type (RV/YE/YY/ZS/DG)
+    var m=L.match(/^(\d{1,3})\s+(\d{2}\/\d{2}\/\d{4}).*?([\d,]+\.\d{2})\s+1400\s+([A-Z]{2})\b/);
+    if(!m) return;
+    var sr=+m[1], date=m[2], amt=parseFloat(m[3].replace(/,/g,'')), dt=m[4];
+    var narr = /Invoice/i.test(L)?'Invoice' : /LFR Recovery/i.test(L)?'LFR Recovery' : /ME SHARE/i.test(L)?'ME Share' : /DC Disc\.?HSD/i.test(L)?'Discount HSD' : /DC Disc\.?MS/i.test(L)?'Discount MS' : /UBIN/i.test(L)?'Union Bank transfer' : /347093|347094/.test(L)?'MAT BPCL transfer' : dt;
+    var kind='other';
+    if(dt==='RV') kind='invoice';
+    else if(dt==='YE') kind='charge';
+    else if(dt==='YY') kind='bankPay';
+    else if(dt==='ZS') kind='matTransfer';
+    else if(dt==='DG') kind='discount';
+    out.cat[kind]+=amt; out.counts[kind]++;
+    out.rows.push({sr:sr,date:date,narr:narr,amount:amt,docType:dt,kind:kind});
+  });
+  return out;
+}
+
+var reconData=null;
+function renderReconcile(){
+  var el=document.getElementById('reportContent');
+  if(!canEdit()){ el.innerHTML='<div class="card"><p style="color:var(--text3);text-align:center;padding:20px">🔒 Reconciliation is restricted to Aamir &amp; Saif.</p></div>'; return; }
+  el.innerHTML='<div class="card"><div class="card-title">🏦 Reconcile Statements</div>'+
+    '<p style="color:var(--text3);font-size:13px;margin:6px 0 12px">Upload a <b>BPCL statement (PDF)</b> or a <b>bank statement (Excel)</b>. The ERP reads it, sorts every line, and shows the totals so you can check it against your books before anything is saved.</p>'+
+    '<input type="file" id="reconFile" accept=".pdf,.xlsx,.xls" style="font-size:13px;margin-bottom:10px"/>'+
+    '<button class="btn btn-blue" onclick="doReconParse()">Parse file</button>'+
+    '<div id="reconResult" style="margin-top:14px"></div></div>';
+}
+async function doReconParse(){
+  var box=document.getElementById('reconResult');
+  var f=(document.getElementById('reconFile')||{}).files; f=f&&f[0];
+  if(!f){ box.innerHTML='<p style="color:#c62828">Choose a file first.</p>'; return; }
+  box.innerHTML='<p style="color:var(--text3)">Reading '+escHtml(f.name)+'…</p>';
+  try{
+    var name=(f.name||'').toLowerCase();
+    if(name.endsWith('.pdf')){
+      var buf=await f.arrayBuffer();
+      var lines=await pdfToLines(buf);
+      var d=parseBpclLines(lines);
+      reconData=d; renderBpclResult(d);
+    } else if(name.endsWith('.xlsx')||name.endsWith('.xls')){
+      box.innerHTML='<p style="color:var(--text3)">Bank-statement (Excel) parsing is being built for the UBI format — upload the BPCL PDF for now.</p>';
+    } else { box.innerHTML='<p style="color:#c62828">Unsupported file type.</p>'; }
+  }catch(e){ box.innerHTML='<p style="color:#c62828">Could not parse: '+escHtml(e.message)+'</p>'; }
+}
+function renderBpclResult(d){
+  var box=document.getElementById('reconResult'); if(!box) return;
+  // month for ERP cross-check (from period start)
+  var ym=null; var pm=(d.period||'').match(/(\d{1,2})\s+([A-Za-z]{3})\s+(\d{4})/);
+  var moMap={jan:'01',feb:'02',mar:'03',apr:'04',may:'05',jun:'06',jul:'07',aug:'08',sep:'09',oct:'10',nov:'11',dec:'12'};
+  if(pm){ ym=pm[3]+'-'+(moMap[pm[2].toLowerCase()]||'01'); }
+  var erpPur=0; if(ym){ entries.filter(function(e){ return e.submitted&&e.date.slice(0,7)===ym; }).forEach(function(e){ erpPur+=(e.pRcvd||0)*(e.pBuy||0)+(e.dRcvd||0)*(e.dBuy||0); }); erpPur=Math.round(erpPur); }
+  function crow(label,amt,cnt,note){ return '<div class="vrow"><span class="vl">'+label+(cnt?' <span style="color:var(--text3);font-size:11px">('+cnt+')</span>':'')+'</span><span class="vv">'+inr(amt)+(note?' <span style="font-size:11px;color:var(--text3)">'+note+'</span>':'')+'</span></div>'; }
+  var invNote = (ym&&erpPur)? (Math.abs(d.cat.invoice-erpPur)<Math.max(1000,erpPur*0.01)?'✓ matches ERP '+inr(erpPur):'⚠ ERP '+inr(erpPur)) : '';
+  var summary='<div class="card"><div class="card-title">BPCL — '+escHtml(d.period||'statement')+'</div>'+
+    crow('Opening balance (credit)', d.opening||0)+
+    crow('🛢️ Fuel invoices (purchases)', d.cat.invoice, d.counts.invoice, invNote)+
+    crow('Charges (LFR/ME)', d.cat.charge, d.counts.charge)+
+    crow('🏦 Dolly bank payments (UBIN)', d.cat.bankPay, d.counts.bankPay)+
+    crow('🚛 MAT transfers (financing)', d.cat.matTransfer, d.counts.matTransfer)+
+    crow('BPCL discounts', d.cat.discount, d.counts.discount)+
+    (d.cat.other?crow('Other', d.cat.other, d.counts.other):'')+
+    crow('Closing balance (credit)', d.closing||0)+
+    '<div style="font-size:11px;color:var(--text3);margin-top:8px">Check: opening + credits − debits should equal closing. '+
+    'Computed closing: '+inr((d.opening||0)+d.cat.bankPay+d.cat.matTransfer+d.cat.discount-d.cat.invoice-d.cat.charge)+'</div></div>';
+  var td='padding:4px 8px;border:1px solid var(--border);font-size:11px;text-align:right';
+  var td0='padding:4px 8px;border:1px solid var(--border);font-size:11px';
+  var rows=d.rows.map(function(r){ return '<tr><td style="'+td0+'">'+r.date+'</td><td style="'+td0+'">'+escHtml(r.narr)+'</td><td style="'+td+'">'+inr(r.amount)+'</td><td style="'+td0+';text-align:center">'+r.docType+'</td></tr>'; }).join('');
+  var table='<div class="card"><div class="card-title">All '+d.rows.length+' lines</div><div class="tbl-wrap"><table style="width:100%;border-collapse:collapse"><thead><tr><th style="'+td0+'">Date</th><th style="'+td0+'">Narration</th><th style="'+td+'">Amount</th><th style="'+td0+'">Type</th></tr></thead><tbody>'+rows+'</tbody></table></div></div>';
+  box.innerHTML=summary+table+'<p style="font-size:12px;color:var(--text3);margin-top:10px">Nothing has been saved — this is a read-only check. Once you confirm the numbers match, I\'ll wire up the "apply" step (record MAT financing, purchases, BPCL balance).</p>';
 }
 
 // ── RECONCILIATION CHECKER ────────────────────────────────────────
