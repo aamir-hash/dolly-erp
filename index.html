@@ -162,7 +162,7 @@ tr.hi-row td{background:rgba(255,220,2,.06)}
 .modal{background:var(--bg2);border-radius:16px 16px 0 0;padding:20px;width:100%;max-height:85vh;overflow-y:auto}
 .modal-title{font-size:15px;font-weight:800;color:var(--text);margin-bottom:14px}
 @media(min-width:600px){.kpi-grid{grid-template-columns:repeat(4,1fr)}.kpi-grid-4{grid-template-columns:repeat(4,1fr)}}
-@media print{.topbar,.bnav,.btn,.rtabs{display:none!important}.page{display:block!important}body{background:#fff}}
+@media print{.topbar,.bnav,.btn,.rtabs,.modal-overlay,.tabbar{display:none!important}.page{display:none!important}.page.active{display:block!important}body{background:#fff}}
 /* LOGIN */
 .login-overlay{position:fixed;inset:0;background:linear-gradient(150deg,#013a5e 0%,var(--blue) 60%,#017DC5 100%);z-index:1000;display:flex;align-items:center;justify-content:center;padding:20px}
 .login-card{background:#fff;border-radius:20px;padding:32px 24px;width:100%;max-width:380px;box-shadow:0 24px 80px rgba(0,0,0,.35)}
@@ -421,8 +421,10 @@ function computeEntry(e){
   function nz(cur,prev){ return (cur!=null&&!isNaN(cur)) ? cur : (prev||0); }
   var curPtot = nz(e.p1,pPrev.p1)+nz(e.p2,pPrev.p2)+nz(e.p3,pPrev.p3)+nz(e.p4,pPrev.p4);
   var curDtot = nz(e.d1,dPrev.d1)+nz(e.d2,dPrev.d2)+nz(e.d3,dPrev.d3)+nz(e.d4,dPrev.d4);
-  e.pSold = Math.max(0, curPtot - prevPtot);
-  e.dSold = Math.max(0, curDtot - prevDtot);
+  // Testing fuel is drawn through the nozzles then returned to the tank — the totalizer
+  // advances but it is not a sale, so subtract it from the sold litres.
+  e.pSold = Math.max(0, curPtot - prevPtot - (e.pTest||0));
+  e.dSold = Math.max(0, curDtot - prevDtot - (e.dTest||0));
   // Cost basis with tanker
   var prevPcost = (prevNozzles&&prevNozzles.pCost) || settings.rates.pCost;
   var prevDcost = (prevNozzles&&prevNozzles.dCost) || settings.rates.dCost;
@@ -546,6 +548,12 @@ function stepNozzles(){
     '<details><summary style="font-size:12px;color:var(--blue);cursor:pointer;margin-bottom:8px">Show D3 & D4</summary>'+
     nzBlock('d3','D3 (Diesel)',prevD.d3||0)+nzBlock('d4','D4 (Diesel)',prevD.d4||0)+
     '</details></div>'+
+    '<div class="card"><div class="card-title">🧪 Step 2 — Testing (returned to tank)</div>'+
+    '<div class="alert alert-b" style="font-size:11px;margin-bottom:10px">Litres drawn through the nozzles for testing and poured back into the tank. This is <b>not a sale</b>, so it is subtracted from today\'s sold litres.</div>'+
+    '<div class="grid2">'+
+    '<div class="field"><label>MS test (L)</label><input type="number" step="0.01" id="e-pTest" value="'+(draft.pTest!=null?draft.pTest:'')+'" placeholder="0"/></div>'+
+    '<div class="field"><label>HSD test (L)</label><input type="number" step="0.01" id="e-dTest" value="'+(draft.dTest!=null?draft.dTest:'')+'" placeholder="0"/></div>'+
+    '</div></div>'+
     '<div style="display:flex;gap:8px">'+
     '<button class="btn btn-outline" style="width:auto;padding:13px 20px" onclick="saveDraft1();goStep(0)">← Back</button>'+
     '<button class="btn btn-blue" style="flex:1" onclick="saveDraft1();goStep(2)">Next — Stock Check →</button></div>';
@@ -554,6 +562,9 @@ function updNz(id, prev){ var v=parseFloat(document.getElementById('e-'+id).valu
 function saveDraft1(){
   ['p1','p2','p3','p4','d1','d2','d3','d4'].forEach(function(k){
     var el=document.getElementById('e-'+k); if(el){ var v=parseFloat(el.value); if(!isNaN(v)) draft[k]=v; }
+  });
+  ['pTest','dTest'].forEach(function(k){
+    var el=document.getElementById('e-'+k); if(el){ var v=parseFloat(el.value); draft[k]=isNaN(v)?0:v; }
   });
 }
 
@@ -691,6 +702,7 @@ function stepReview(){
     '<div class="vrow"><span class="vl">HSD sold @ ₹'+e.dSell+'</span><span class="vv info">'+fL(e.dSold)+' = '+inr(e.dRev)+'</span></div>'+
     '<div class="vrow"><span class="vl">MS margin (@ ₹'+(e.pSell-e.pCost).toFixed(2)+'/L)</span><span class="vv ok">'+inr(e.pMargin)+'</span></div>'+
     '<div class="vrow"><span class="vl">HSD margin (@ ₹'+(e.dSell-e.dCost).toFixed(2)+'/L)</span><span class="vv ok">'+inr(e.dMargin)+'</span></div>'+
+    (((e.pTest||0)+(e.dTest||0))>0?'<div class="vrow"><span class="vl">🧪 Testing (returned, not sold)</span><span class="vv">MS '+fL(e.pTest||0)+' · HSD '+fL(e.dTest||0)+'</span></div>':'')+
     '</div>'+
     '<div class="card"><div class="card-title">Collections</div>'+
     '<div class="vrow"><span class="vl">Cash</span><span class="vv">'+inr(e.cash)+'</span></div>'+
@@ -1212,11 +1224,13 @@ function showDetail(date){
     '<div class="modal-title">'+fmtDate(e.date)+' · '+fmtDay(e.date)+'</div>'+
     '<button onclick="closeModal()" style="background:var(--border);border:none;border-radius:8px;padding:6px 12px;cursor:pointer;font-size:13px">✕ Close</button></div>'+
     dayDetailHTML(e)+
-    '<div style="display:flex;gap:8px;margin-top:12px">'+
-    '<button class="btn btn-outline" style="flex:1" onclick="openEditEntry(\''+e.date+'\')">✏️ Edit values</button>'+
-    (e.type==='daily'?'<button class="btn btn-outline" style="flex:1" onclick="loadForEdit(\''+e.date+'\')">🔢 Edit via nozzles</button>':'')+
-    '</div>'+
-    '<button class="btn" style="background:#dc2626;color:#fff;margin-top:8px" onclick="deleteEntry(\''+e.date+'\')">🗑 Delete this entry</button>';
+    (canEdit()?
+      ('<div style="display:flex;gap:8px;margin-top:12px">'+
+       '<button class="btn btn-outline" style="flex:1" onclick="openEditEntry(\''+e.date+'\')">✏️ Edit values</button>'+
+       (e.type==='daily'?'<button class="btn btn-outline" style="flex:1" onclick="loadForEdit(\''+e.date+'\')">🔢 Edit via nozzles</button>':'')+
+       '</div>'+
+       '<button class="btn" style="background:#dc2626;color:#fff;margin-top:8px" onclick="deleteEntry(\''+e.date+'\')">🗑 Delete this entry</button>')
+      : '<p style="font-size:12px;color:var(--text3);text-align:center;margin-top:14px">🔒 Editing is restricted to Aamir &amp; Saif.</p>');
   document.getElementById('detailModal').classList.remove('hidden');
 }
 
@@ -1226,6 +1240,7 @@ function getDeleted(){ try{ var d=localStorage.getItem(SK_DELETED); if(d) return
 function saveDeleted(d){ try{ localStorage.setItem(SK_DELETED,JSON.stringify(d)); }catch(e){} }
 
 function deleteEntry(date){
+  if(!requireEdit()) return;
   if(!confirm('Delete the entry for '+fmtDate(date)+'? This removes it everywhere and cannot be undone from the app.')) return;
   var del=getDeleted(); if(del.indexOf(date)<0){ del.push(date); saveDeleted(del); }
   entries = entries.filter(function(x){ return x.date!==date; });
@@ -1237,6 +1252,7 @@ function deleteEntry(date){
 
 // ── Universal value editor (works for daily AND imported entries) ──
 function openEditEntry(date){
+  if(!requireEdit()) return;
   var e=entries.find(function(x){ return x.date===date; });
   if(!e) return;
   draft=JSON.parse(JSON.stringify(e));
@@ -1272,6 +1288,7 @@ function readEditExps(){
   });
 }
 function saveEditEntry(date){
+  if(!requireEdit()) return;
   var e=entries.find(function(x){ return x.date===date; }); if(!e) return;
   readEditExps();
   function g(id){ var el=document.getElementById('ed-'+id); var v=el?parseFloat(el.value):NaN; return isNaN(v)?0:v; }
@@ -1296,6 +1313,7 @@ function saveEditEntry(date){
 }
 function closeModal(evt){ if(!evt||evt.target===document.getElementById('detailModal')) document.getElementById('detailModal').classList.add('hidden'); }
 function loadForEdit(date){
+  if(!requireEdit()) return;
   var e=entries.find(function(x){ return x.date===date; });
   if(!e) return;
   draft=JSON.parse(JSON.stringify(e)); curStep=0;
@@ -1418,6 +1436,7 @@ function getPartyBalance(partyName){
 }
 
 function recordPayment(partyName){
+  if(!requireEdit()) return;
   var amtStr=prompt('Payment received from '+partyName+' (₹):');
   if(!amtStr) return;
   var amt=parseFloat(amtStr);
@@ -1431,6 +1450,7 @@ function recordPayment(partyName){
 }
 
 function editPartyRate(idx){
+  if(!requireEdit()) return;
   var parties=getParties();
   var p=parties[idx];
   var newRate=prompt('HSD rate for '+p.name+' (current: ₹'+p.hsdRate+'/L):');
@@ -1486,9 +1506,9 @@ function showPartyDetail(name){
     '<div class="kpi"><div class="kv">'+inr(payments.reduce(function(s,x){ return s+x.amount; },0))+'</div><div class="kl">Total Paid</div></div>'+
     '<div class="kpi"><div class="kv">₹'+(getParties().find(function(p){return p.name===name;})||{hsdRate:90.65}).hsdRate+'/L</div><div class="kl">HSD Rate</div></div>'+
     '</div>'+
-    '<div style="display:flex;gap:8px;margin-bottom:12px">'+
+    (canEdit()?('<div style="display:flex;gap:8px;margin-bottom:12px">'+
     '<button class="btn btn-green btn-sm" style="width:auto;padding:10px 18px;font-size:13px" onclick="recordPayment(\''+name+'\')">💰 Record Payment</button>'+
-    (currentRole==='admin'&&pidx>=0?'<button class="btn btn-outline btn-sm" style="width:auto;padding:10px 18px;font-size:13px" onclick="editPartyRate('+pidx+');closeModal()">✏️ Edit Rate</button>':'')+'</div>'+
+    (pidx>=0?'<button class="btn btn-outline btn-sm" style="width:auto;padding:10px 18px;font-size:13px" onclick="editPartyRate('+pidx+');closeModal()">✏️ Edit Rate</button>':'')+'</div>'):'')+
     (rows?'<div class="tbl-wrap"><table><thead><tr><th>Date</th><th>Type</th><th>Litres</th><th>Rate</th><th>Debit</th><th>Credit</th></tr></thead><tbody>'+rows+'</tbody></table></div>':
     '<p style="text-align:center;color:var(--text3);padding:20px">No transactions yet</p>');
   document.getElementById('detailModal').classList.remove('hidden');
@@ -1759,6 +1779,12 @@ var GRAPH_SCOPES=['User.Read','Files.ReadWrite.All'];
 
 var SK_USERS='dp_users_v4';
 var currentUser=null, currentRole=null, currentDisplayName=null;
+
+// Only these accounts may EDIT or DELETE existing values (entries, party rates, payments).
+// Everyone else can still create the daily entry, but not change submitted values.
+var EDITORS=['aamir@oregenesis.onmicrosoft.com','saif@oregenesis.onmicrosoft.com'];
+function canEdit(){ return !!currentUser && EDITORS.indexOf((currentUser||'').toLowerCase())>=0; }
+function requireEdit(){ if(canEdit()) return true; showToast('🔒 Only Aamir & Saif can edit or delete values'); return false; }
 
 // admin sees Entry/Today/Reports/Parties/History/Settings; staff sees all except Settings
 var ROLE_TABS={admin:[0,1,2,3,4,5], staff:[0,1,2,3,4]};
