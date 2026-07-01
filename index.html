@@ -256,6 +256,7 @@ tr.hi-row td{background:rgba(255,220,2,.06)}
     <button class="rtab" onclick="rTab(4,this)">🔍 Check</button>
     <button class="rtab" onclick="rTab(5,this)">🏦 Reconcile</button>
     <button class="rtab" onclick="rTab(6,this)">📋 DSR</button>
+    <button class="rtab" onclick="rTab(7,this)">💵 Cash Match</button>
   </div>
   <div id="reportContent"></div>
 </div>
@@ -743,6 +744,9 @@ function stepCollections(){
     ci('cash','Cash (₹)',draft.cash)+ci('upi','UPI / PhonePe (₹)',draft.upi)+
     ci('swipe','Swipe Card (₹)',draft.swipe)+
     '</div></div>'+
+    '<div class="card"><div class="card-title">💵 Cash sent to Chandrapur office</div>'+
+    '<div class="alert alert-b" style="font-size:11px;margin-bottom:10px">Cash physically carried to the office today. Should equal cash collected − cash expenses. The monthly Cash Match tab flags any gap.</div>'+
+    '<div class="field"><label>Cash sent to office (₹)</label><input type="number" id="e-cashToOffice" step="0.01" value="'+(draft.cashToOffice!=null&&draft.cashToOffice!==''?draft.cashToOffice:'')+'" placeholder="0"/></div></div>'+
     '<div class="card"><div class="card-title">🚛 Credit Sales by Party</div>'+
     '<div class="alert alert-b" style="font-size:11px;margin-bottom:10px">Enter diesel <b>litres</b> given on credit to each party. Aamir Transport is billed at <b>cost</b> automatically; for the others enter the <b>rate ₹/L</b> (defaults to their usual rate — change it if today\'s credit rate is different). Leave blank if none.</div>'+
     _fleetRows+
@@ -766,7 +770,7 @@ function stepCollections(){
     '<button class="btn btn-blue" style="flex:1" onclick="saveDraft3();goStep(6)">Next — Expenses →</button></div>';
 }
 function saveDraft3(){
-  ['cash','upi','swipe','pRcvd','pBuy','dRcvd','dBuy','pSell','dSell'].forEach(function(k){
+  ['cash','upi','swipe','pRcvd','pBuy','dRcvd','dBuy','pSell','dSell','cashToOffice'].forEach(function(k){
     var el=document.getElementById('e-'+k); if(el){ var v=parseFloat(el.value); draft[k]=isNaN(v)?0:v; }
   });
   var _parties=getParties(); var _fl={}, _fr={}, _pl={}, _prr={};
@@ -966,7 +970,54 @@ function renderReport(tab){
   else if(tab===4) renderCheckReport();
   else if(tab===5) renderReconcile();
   else if(tab===6) renderDSR();
+  else if(tab===7) renderCashMatch();
   else renderAllTime();
+}
+
+// ── CASH MATCH — pump cash vs cash sent to Chandrapur office ───────
+var cashMonth = todayStr().slice(0,7);
+function renderCashMatch(){
+  var months=[...new Set(entries.filter(function(e){ return e.submitted; }).map(function(e){ return e.date.slice(0,7); }))].sort().reverse();
+  if(months.indexOf(cashMonth)<0&&months.length) cashMonth=months[0];
+  var list=entries.filter(function(e){ return e.submitted && e.date.slice(0,7)===cashMonth; }).sort(function(a,b){ return a.date.localeCompare(b.date); });
+  var mn=new Date(cashMonth+'-01').toLocaleDateString('en-IN',{month:'long',year:'numeric'}).toUpperCase();
+  var T={cash:0,exp:0,net:0,sent:0,diff:0};
+  function n0(v){ return Math.round(v||0).toLocaleString('en-IN'); }
+  var td='padding:7px 10px;border-bottom:1px solid var(--border);font-size:12px;text-align:right;font-family:var(--mono)';
+  var body=list.map(function(e){
+    var cash=+e.cash||0, exp=+e.totalExp||0, net=cash-exp;
+    var sent=(e.cashToOffice!=null&&e.cashToOffice!=='')?+e.cashToOffice:null;
+    var diff=(sent==null)?null:(net-sent);
+    T.cash+=cash;T.exp+=exp;T.net+=net;T.sent+=(sent||0); if(diff!=null)T.diff+=diff;
+    var dc=(diff==null)?'var(--text3)':(Math.abs(diff)<1?'#1e7d34':'#c0392b');
+    return '<tr>'+
+      '<td style="padding:7px 10px;border-bottom:1px solid var(--border);font-size:12px;font-weight:700">'+e.date.slice(8)+' '+new Date(e.date).toLocaleDateString("en-IN",{month:"short"})+'</td>'+
+      '<td style="'+td+'">'+n0(cash)+'</td><td style="'+td+';color:#c0392b">'+n0(exp)+'</td>'+
+      '<td style="'+td+';font-weight:700">'+n0(net)+'</td>'+
+      '<td style="'+td+'">'+(sent==null?'—':n0(sent))+'</td>'+
+      '<td style="'+td+';color:'+dc+';font-weight:700">'+(diff==null?'—':n0(diff))+'</td></tr>';
+  }).join('');
+  var tdT='padding:9px 10px;border-top:2px solid var(--blue);font-size:12px;text-align:right;font-weight:800;font-family:var(--mono)';
+  var tdc=(Math.abs(T.diff)<1?'#1e7d34':'#c0392b');
+  var totalRow='<tr style="background:var(--bg2)"><td style="padding:9px 10px;border-top:2px solid var(--blue);font-size:12px;font-weight:800">TOTAL</td>'+
+    '<td style="'+tdT+'">'+n0(T.cash)+'</td><td style="'+tdT+';color:#c0392b">'+n0(T.exp)+'</td><td style="'+tdT+'">'+n0(T.net)+'</td>'+
+    '<td style="'+tdT+'">'+n0(T.sent)+'</td><td style="'+tdT+';color:'+tdc+'">'+n0(T.diff)+'</td></tr>';
+  var hb='padding:8px 10px;font-size:11px;font-weight:700;color:#fff;text-align:right;line-height:1.25';
+  var hb0='padding:8px 10px;font-size:11px;font-weight:700;color:#fff;text-align:left';
+  var head='<tr style="background:var(--blue)"><th style="'+hb0+'">DATE</th>'+
+    '<th style="'+hb+'">CASH<br>COLLECTED</th><th style="'+hb+'">CASH<br>EXPENSES</th>'+
+    '<th style="'+hb+'">NET<br>(TO OFFICE)</th><th style="'+hb+'">SENT TO<br>OFFICE</th><th style="'+hb+'">DIFFERENCE<br>(LEAKAGE)</th></tr>';
+  var el=document.getElementById('reportContent');
+  var headline=(Math.abs(T.diff)<1)
+    ? '<div class="alert alert-g" style="margin-bottom:12px">✓ Cash matches for '+mn+' — no leakage (net ₹'+n0(T.net)+' = sent ₹'+n0(T.sent)+').</div>'
+    : '<div class="alert alert-a" style="margin-bottom:12px">⚠ '+mn+': net cash ₹'+n0(T.net)+' vs sent ₹'+n0(T.sent)+' → <b>gap ₹'+n0(T.diff)+'</b> to investigate.</div>';
+  el.innerHTML='<div class="rtabs" style="margin-bottom:12px">'+
+    months.map(function(m){ return '<button class="rtab'+(m===cashMonth?' active':'')+'" onclick="cashMonth=\''+m+'\';renderCashMatch()">'+new Date(m+'-01').toLocaleDateString('en-IN',{month:'short',year:'2-digit'})+'</button>'; }).join('')+'</div>'+
+    headline+
+    '<p style="font-size:11px;color:var(--text3);margin-bottom:10px">Net to office = cash collected − cash expenses. Difference = net − cash sent to Chandrapur office. Positive = less sent than expected.</p>'+
+    '<div class="card"><div class="card-title">💵 CASH MATCH — '+mn+'</div>'+
+    '<div class="tbl-wrap"><table style="width:100%;border-collapse:collapse;min-width:640px"><thead>'+head+'</thead><tbody>'+
+    (body||'<tr><td colspan="6" style="text-align:center;color:var(--text3);padding:16px">No entries this month</td></tr>')+totalRow+'</tbody></table></div></div>';
 }
 
 // ── DSR — DAILY STOCK REGISTER (MS + HSD) ─────────────────────────
