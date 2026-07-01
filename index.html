@@ -253,6 +253,7 @@ tr.hi-row td{background:rgba(255,220,2,.06)}
     <button class="rtab" onclick="rTab(1,this)">Weekly</button>
     <button class="rtab" onclick="rTab(2,this)">Monthly</button>
     <button class="rtab" onclick="rTab(3,this)">All-time</button>
+    <button class="rtab" onclick="rTab(4,this)">🔍 Check</button>
   </div>
   <div id="reportContent"></div>
 </div>
@@ -800,7 +801,100 @@ function renderReport(tab){
   if(tab===0) renderDailyReport();
   else if(tab===1) renderWeeklyReport();
   else if(tab===2) renderMonthlyReport();
+  else if(tab===4) renderCheckReport();
   else renderAllTime();
+}
+
+// ── RECONCILIATION CHECKER ────────────────────────────────────────
+// Verifies the ERP against the master ledger and guards against the
+// balance-spiral bug. Pure engine (returns a structured result) reused by
+// the in-app Check screen AND the nightly sync task (stored as data.reconCheck).
+var lastReconCheck=null;
+async function runReconCheck(){
+  var checks=[];
+  var tok=await getGraphToken(); if(!tok) throw new Error('Not signed in (no Graph token).');
+  var sid=await spSync.getSiteId(); if(!sid) throw new Error('No SharePoint site id.');
+  // Authoritative data file (email fields live here)
+  var data=await fetch('https://graph.microsoft.com/v1.0/sites/'+sid+'/drive/root:/'+GRAPH_FILE_PATH+':/content',{headers:{'Authorization':'Bearer '+tok}}).then(function(r){ return r.json(); });
+
+  // Check A — balances vs master ledger
+  var mat=null, auro=null;
+  try{
+    var path='2026-2027/Accounting/Transactions/Dolly Statement/Accounts  Dolly Final.xlsx';
+    var lurl='https://graph.microsoft.com/v1.0/sites/'+sid+'/drive/root:/'+encodeURI(path)+":/workbook/worksheets('Statement%20Latest')/usedRange(valuesOnly=true)?$select=values";
+    var lv=(await fetch(lurl,{headers:{'Authorization':'Bearer '+tok}}).then(function(r){ return r.json(); })).values||[];
+    for(var i=0;i<lv.length;i++){ for(var j=0;j<lv[i].length;j++){ var c=lv[i][j];
+      if(typeof c==='string'){ var t=c.trim(); if(/^MAT Balance In Dolly/i.test(t)) mat=+lv[i][j+1]; if(/^Auro\s+Balance In Dolly/i.test(t)) auro=+lv[i][j+1]; } } }
+  }catch(e){}
+  var targets={'AAMIR TRANSPORT':(mat!=null?-mat:null),'ARVINDO':(auro!=null?-auro:null),'TAJ TRADERS':-1000000,'KRISHABH CON.':0,'BALAJI TRANSPO':0,'SS TRANSPORT':0,'VIKAS COAL':0,'VAIBHAV YERAWAR':0};
+  if(mat==null||auro==null){ checks.push({name:'Balances vs master ledger',status:'FAIL',detail:'Could not read the MAT/Auro balance cells from the master ledger.'}); }
+  else {
+    var mism=[];
+    getParties().forEach(function(p){ var tg=targets[p.name]; if(tg==null) return; var b=getPartyBalance(p.name); if(Math.abs(b-tg)>1) mism.push(p.name+': app '+inr(b)+' vs ledger '+inr(tg)); });
+    checks.push({name:'Balances vs master ledger',status:(mism.length?'FAIL':'PASS'),detail:(mism.length?mism.join('; '):'All parties match (MAT cell → AAMIR '+inr(targets['AAMIR TRANSPORT'])+', Auro → ARVINDO '+inr(targets['ARVINDO'])+').')});
+  }
+
+  // Check B — no spiral / no reconciliation rows
+  var RECON=/Daily ledger sync|Bank reconciliation|Advance deposit|Ledger reconciliation|Ledger\/Bank/i;
+  var reconRows=getPayments().filter(function(p){ return RECON.test(p.note||''); });
+  var badPos=getParties().filter(function(p){ return p.name!=='AAMIR TRANSPORT' && getPartyBalance(p.name)>1; }).map(function(p){ return p.name; });
+  var runaway=getParties().filter(function(p){ return Math.abs(getPartyBalance(p.name))>50000000; }).map(function(p){ return p.name; });
+  var bIss=[];
+  if(reconRows.length) bIss.push(reconRows.length+' reconciliation payment row(s) present (should be 0)');
+  if(badPos.length) bIss.push('owing Dolly but shouldn’t be: '+badPos.join(', '));
+  if(runaway.length) bIss.push('balance over ₹5 Cr (spiral?): '+runaway.join(', '));
+  checks.push({name:'No spiral / no recon rows',status:(bIss.length?'FAIL':'PASS'),detail:(bIss.length?bIss.join('; '):'No reconciliation rows; only AAMIR in debit; no runaway balances.')});
+
+  // Check C — report totals add up
+  function periodRev(pred){ return entries.filter(function(e){ return e.submitted&&pred(e.date); }).reduce(function(s,e){ return s+(e.totalRev||0); },0); }
+  function extractRev(html){ var tx=(html||'').replace(/<[^>]+>/g,' '); var m=tx.match(/Revenue\s*₹\s*([\d,]+)/); return m?+m[1].replace(/,/g,''):null; }
+  var now=new Date();
+  var pm=new Date(now.getFullYear(),now.getMonth()-1,1); var ym=pm.getFullYear()+'-'+String(pm.getMonth()+1).padStart(2,'0');
+  var monE=Math.round(periodRev(function(d){ return d.slice(0,7)===ym; })); var monR=extractRev(monthReportHtml(ym));
+  var mon=new Date(now); mon.setDate(now.getDate()-(((now.getDay()+6)%7)+7)); var ws=localISO(mon);
+  var we=new Date(mon); we.setDate(mon.getDate()+6); var weISO=localISO(we);
+  var wkE=Math.round(periodRev(function(d){ return d>=ws&&d<=weISO; })); var wkR=extractRev(weekReportHtml(ws));
+  var seen={}, dups=[]; entries.forEach(function(e){ if(e.submitted){ if(seen[e.date]) dups.push(e.date); seen[e.date]=1; } });
+  var cIss=[];
+  if(monR==null||Math.abs(monE-monR)>2) cIss.push('month revenue: entries '+inr(monE)+' vs report '+(monR==null?'—':inr(monR)));
+  if(wkR==null||Math.abs(wkE-wkR)>2) cIss.push('week revenue: entries '+inr(wkE)+' vs report '+(wkR==null?'—':inr(wkR)));
+  if(dups.length) cIss.push('duplicate submitted dates: '+dups.join(', '));
+  checks.push({name:'Report totals add up',status:(cIss.length?'FAIL':'PASS'),detail:(cIss.length?cIss.join('; '):'Weekly ('+inr(wkE)+') & monthly ('+inr(monE)+') report totals equal the sum of daily entries; no duplicate dates.')});
+
+  // Check D — email fields not blank
+  var fe=(data.entries||[]).filter(function(e){ return e.submitted; }).sort(function(a,b){ return a.date.localeCompare(b.date); }).slice(-1)[0];
+  var dIss=[];
+  if(!((data.lastWeekReportHtml||'')+'').trim()) dIss.push('lastWeekReportHtml empty');
+  if(!((data.lastMonthReportHtml||'')+'').trim()) dIss.push('lastMonthReportHtml empty');
+  if(!fe||!((fe.reportHtml||'')+'').trim()) dIss.push('latest daily reportHtml empty');
+  checks.push({name:'Email fields present',status:(dIss.length?'FAIL':'PASS'),detail:(dIss.length?dIss.join('; '):'lastWeek + lastMonth + latest daily report HTML all present in the file.')});
+
+  var overall=checks.every(function(c){ return c.status==='PASS'; })?'PASS':'FAIL';
+  return { ranAt:new Date().toISOString(), overall:overall, checks:checks };
+}
+
+function renderCheckReport(){
+  var el=document.getElementById('reportContent');
+  el.innerHTML='<div class="card"><div class="card-title">🔍 Reconciliation Check</div>'+
+    '<p style="color:var(--text3);font-size:13px;margin:6px 0 12px">Verifies party balances against the master ledger, guards against the balance-spiral bug, checks the weekly/monthly report totals against the daily entries, and confirms the email report fields aren’t blank.</p>'+
+    '<button class="btn" onclick="doReconCheck()">Run check now</button>'+
+    '<div id="reconResult" style="margin-top:14px"></div></div>';
+  if(lastReconCheck) renderReconResult(lastReconCheck,true);
+}
+async function doReconCheck(){
+  var box=document.getElementById('reconResult'); if(box) box.innerHTML='<p style="color:var(--text3)">Running checks — reading the master ledger…</p>';
+  try{ var r=await runReconCheck(); lastReconCheck=r; renderReconResult(r,false); }
+  catch(e){ if(box) box.innerHTML='<p style="color:#c62828">Check could not run: '+escHtml(e.message)+'</p>'; }
+}
+function renderReconResult(r,stale){
+  var box=document.getElementById('reconResult'); if(!box) return;
+  var head='<div style="font-weight:800;font-size:16px;color:'+(r.overall==='PASS'?'#2e7d32':'#c62828')+'">'+(r.overall==='PASS'?'✓ All checks passed':'✗ Issues found')+'</div>'+
+    '<div style="font-size:11px;color:var(--text3);margin:2px 0 12px">'+(stale?'Last result — ':'Checked ')+new Date(r.ranAt).toLocaleString('en-IN')+'</div>';
+  var rows=r.checks.map(function(c){ var col=c.status==='PASS'?'#2e7d32':'#c62828'; var ic=c.status==='PASS'?'✓':'✗';
+    return '<div style="border:1.5px solid var(--border);border-radius:10px;padding:10px 12px;margin-bottom:8px">'+
+      '<div style="font-weight:700;color:'+col+'">'+ic+' '+escHtml(c.name)+'</div>'+
+      '<div style="font-size:12px;color:var(--text3);margin-top:3px">'+escHtml(c.detail)+'</div></div>'; }).join('');
+  box.innerHTML=head+rows;
 }
 
 // ── DAILY ─────────────────────────────────────────────────────────
