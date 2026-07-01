@@ -1576,6 +1576,16 @@ var spSync = {
     try{
       var tok=await getGraphToken(); if(!tok){ this.updateStatus('⚠ auth'); this.pendingPush=true; return false; }
       var sid=await this.getSiteId(); if(!sid){ this.updateStatus('⚠ site'); this.pendingPush=true; return false; }
+      // Recompute the scheduled-email report fields on every push so a normal
+      // entry-save can never wipe them (blind full-file PUT). Previous month +
+      // last completed Mon–Sun week, derived from the in-memory entries.
+      // If a builder throws, the error propagates to the outer catch and the
+      // PUT is skipped, preserving the file's existing good values.
+      var _t = new Date();
+      var _pm = new Date(_t.getFullYear(), _t.getMonth()-1, 1);
+      var _ym = _pm.getFullYear()+'-'+String(_pm.getMonth()+1).padStart(2,'0');
+      var _mon = new Date(_t); _mon.setDate(_t.getDate() - (((_t.getDay()+6)%7) + 7));
+      var _ws = _mon.getFullYear()+'-'+String(_mon.getMonth()+1).padStart(2,'0')+'-'+String(_mon.getDate()).padStart(2,'0');
       var payload = JSON.stringify({
         entries: entries,
         settings: settings,
@@ -1583,6 +1593,10 @@ var spSync = {
         payments: getPayments(),
         users: getUsers(),
         deletedDates: getDeleted(),
+        lastMonthReportHtml: monthReportHtml(_ym),
+        lastWeekReportHtml: weekReportHtml(_ws),
+        lastMonthYm: _ym,
+        lastWeekStart: _ws,
         lastUpdated: new Date().toISOString(),
         updatedBy: currentDisplayName||'unknown'
       });
