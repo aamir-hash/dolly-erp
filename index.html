@@ -1547,13 +1547,23 @@ var spSync = {
         });
         localStorage.setItem(SK_PARTIES,JSON.stringify(lp));
       }catch(ex){} }
-      if(data.payments && data.payments.length){ try{
+      // Payments sync: genuine manual payments merge additively (so an unpushed local
+      // payment survives a pull), but reconciliation/adjustment rows are CLOUD-AUTHORITATIVE
+      // — any local recon row not present in the file is PRUNED. This stops a stale device
+      // from resurrecting old reconciliation rows and re-spiralling party balances. Balances
+      // are pinned via each party's openingBalance (parties merge above), not stacked rows.
+      if(data.payments){ try{
+        var RECON=/Daily ledger sync|Bank reconciliation|Advance deposit|Ledger reconciliation|Ledger\/Bank|Credit transfer/i;
         var lpay=getPayments();
         var pkey=function(p){ return p.party+'|'+p.date+'|'+p.amount+'|'+(p.note||''); };
+        var fileSeen={};
+        (data.payments||[]).forEach(function(p){ fileSeen[pkey(p)]=1; });
+        // keep local rows present in the file, OR genuine manual payments (non-recon notes)
+        var kept=lpay.filter(function(p){ return fileSeen[pkey(p)] || !RECON.test(p.note||''); });
         var seen={};
-        lpay.forEach(function(p){ seen[pkey(p)]=1; });
-        data.payments.forEach(function(p){ if(!seen[pkey(p)]){ lpay.push(p); seen[pkey(p)]=1; } });
-        localStorage.setItem(SK_PAYMENTS,JSON.stringify(lpay));
+        kept.forEach(function(p){ seen[pkey(p)]=1; });
+        (data.payments||[]).forEach(function(p){ if(!seen[pkey(p)]){ kept.push(p); seen[pkey(p)]=1; } });
+        localStorage.setItem(SK_PAYMENTS,JSON.stringify(kept));
       }catch(ex){} }
       if(data.users && data.users.length){ try{ localStorage.setItem(SK_USERS,JSON.stringify(data.users)); }catch(ex){} }
 
