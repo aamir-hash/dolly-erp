@@ -279,7 +279,15 @@ tr.hi-row td{background:rgba(255,220,2,.06)}
 <!-- ═══════════════════════════════════════════ PAGE 4: SETTINGS ═ -->
 <div class="page" id="page5">
   <div class="hero"><h2>Settings</h2><p>Rates · Nozzle baseline · Backup</p></div>
-  <div class="card">
+  <div class="card" id="rolePermsCard">
+    <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px">
+      <div class="card-title" style="margin:0">🔐 Role Permissions</div>
+      <button class="btn btn-outline btn-sm" style="width:auto;padding:8px 14px" onclick="resetRolePerms()">↩ Reset Defaults</button>
+    </div>
+    <p style="font-size:11px;color:var(--text3);margin:6px 0 10px">Turn features on/off per role. Only Aamir &amp; Saif (admins) can change this; everyone else is an Operator.</p>
+    <div id="rolePermsBody"></div>
+  </div>
+  <div class="card" id="ratesCard">
     <div class="card-title">📋 Current Rates</div>
     <div class="grid2">
       <div class="field"><label>MS Sell ₹/L</label><input type="number" id="s-pSell" step="0.01" oninput="saveSettings()"/></div>
@@ -529,7 +537,7 @@ function showToast(msg){ var t=document.createElement('div'); t.className='toast
 // ═══════════════════════════════════════ NAVIGATION ══════════════
 var curPage=0, curStep=0, curRTab=0;
 function nav(i){
-  var allowed=ROLE_TABS[currentRole]||[0,1,2,3,4];
+  var allowed=allowedTabs();
   if(allowed.indexOf(i)<0){ i=allowed[0]; }
   document.querySelectorAll('.page').forEach(function(p,j){ p.classList.toggle('active',i===j); });
   document.querySelectorAll('.bn').forEach(function(b,j){ b.classList.toggle('active',i===j); });
@@ -921,7 +929,7 @@ function dayDetailHTML(e){
     sfAlerts+
     '<div class="kpi-grid">'+
     '<div class="kpi y"><div class="kv">'+inr(e.totalRev)+'</div><div class="kl">Revenue</div></div>'+
-    '<div class="kpi '+(e.netProfit>=0?'g':'r')+'"><div class="kv">'+inr(e.netProfit)+'</div><div class="kl">Net Profit</div></div>'+
+    (hasPerm('viewProfit')?'<div class="kpi '+(e.netProfit>=0?'g':'r')+'"><div class="kv">'+inr(e.netProfit)+'</div><div class="kl">Net Profit</div></div>':'')+
     '<div class="kpi"><div class="kv">'+fL(e.dSold)+'</div><div class="kl">HSD Sold</div></div>'+
     '<div class="kpi"><div class="kv">'+fL(e.pSold)+'</div><div class="kl">MS Sold</div></div></div>'+
     '<div class="card"><div class="card-title">💳 Collections</div>'+
@@ -1058,7 +1066,7 @@ function parseBpclLines(lines){
 var reconData=null;
 function renderReconcile(){
   var el=document.getElementById('reportContent');
-  if(!canEdit()){ el.innerHTML='<div class="card"><p style="color:var(--text3);text-align:center;padding:20px">🔒 Reconciliation is restricted to Aamir &amp; Saif.</p></div>'; return; }
+  if(!hasPerm('reconcile')){ el.innerHTML='<div class="card"><p style="color:var(--text3);text-align:center;padding:20px">🔒 You don\'t have permission to reconcile statements.</p></div>'; return; }
   el.innerHTML='<div class="card"><div class="card-title">🏦 Reconcile Statements</div>'+
     '<p style="color:var(--text3);font-size:13px;margin:6px 0 12px">Upload a <b>BPCL statement (PDF)</b> or a <b>bank statement (Excel)</b>. The ERP reads it, sorts every line, and shows the totals so you can check it against your books before anything is saved.</p>'+
     '<input type="file" id="reconFile" accept=".pdf,.xlsx,.xls" style="font-size:13px;margin-bottom:10px"/>'+
@@ -1452,7 +1460,7 @@ function renderMonthlyReport(){
     '<div class="hero"><h2>'+mn+'</h2><p>'+month.length+' days · HSD '+Math.round(tHSD).toLocaleString('en-IN')+'L · MS '+Math.round(tMS).toLocaleString('en-IN')+'L</p></div>'+
     '<div class="kpi-grid">'+
     '<div class="kpi y"><div class="kv">'+inr(tRev)+'</div><div class="kl">Total Revenue</div><div class="ks">Avg '+inr(month.length?tRev/month.length:0)+'/day</div></div>'+
-    '<div class="kpi '+(tProfit>=0?'g':'r')+'"><div class="kv">'+inr(tProfit)+'</div><div class="kl">Net Profit</div></div>'+
+    (hasPerm('viewProfit')?'<div class="kpi '+(tProfit>=0?'g':'r')+'"><div class="kv">'+inr(tProfit)+'</div><div class="kl">Net Profit</div></div>':'')+
     '<div class="kpi"><div class="kv">'+Math.round(tHSD+tMS).toLocaleString('en-IN')+' L</div><div class="kl">Total Volume</div></div>'+
     '<div class="kpi r"><div class="kv">'+inr(tExp)+'</div><div class="kl">Expenses</div></div></div>'+
     '<div class="card"><div class="card-title">Collections Breakdown</div>'+
@@ -1461,11 +1469,11 @@ function renderMonthlyReport(){
     '<div class="vrow"><span class="vl">Swipe + Fleet</span><span class="vv ok">'+inr(tSwipe)+'</span></div>'+
     '<div class="vrow"><span class="vl" style="font-weight:700">Total collected</span><span class="vv ok">'+inr(tColl)+'</span></div>'+
     '</div>'+
-    '<div class="pbox">'+
+    (hasPerm('viewProfit')?'<div class="pbox">'+
     '<div class="pb-title">Monthly P&L — '+mn+'</div>'+
     '<div class="prow"><span class="pl">Gross margin on sales</span><span class="pv">'+inr(tMargin)+'</span></div>'+
     '<div class="prow"><span class="pl">Less: total expenses</span><span class="pv exp">−'+inr(tExp)+'</span></div>'+
-    '<div class="prow"><span class="pl"><strong>Net Profit</strong></span><span class="pv big '+(tProfit<0?'exp':'')+'">'+inr(tProfit)+'</span></div></div>'+
+    '<div class="prow"><span class="pl"><strong>Net Profit</strong></span><span class="pv big '+(tProfit<0?'exp':'')+'">'+inr(tProfit)+'</span></div></div>':'')+
     '<div class="card"><div class="card-title">📊 Daily Revenue Chart</div>'+bars+'</div>'+
     '<div class="card"><div class="card-title">📋 Daily Register — '+mn+'</div>'+
     '<div class="tbl-wrap"><table><thead><tr><th>Date</th><th>Day</th><th>HSD (L)</th><th>MS (L)</th><th>Revenue</th><th>Cash</th><th>UPI</th><th>Expenses</th><th>Net</th></tr></thead>'+
@@ -1658,6 +1666,8 @@ function loadForEdit(date){
 // ═══════════════════════════════════════ SETTINGS ════════════════
 function renderSettings(){
   var s=settings;
+  renderRolePerms();
+  var ratesCard=document.getElementById('ratesCard'); if(ratesCard) ratesCard.style.display=hasPerm('fuelPrices')?'':'none';
   document.getElementById('s-pSell').value=s.rates.pSell;
   document.getElementById('s-pBuy').value=s.rates.pBuy;
   document.getElementById('s-dSell').value=s.rates.dSell;
@@ -2113,14 +2123,78 @@ var GRAPH_SCOPES=['User.Read','Files.ReadWrite.All'];
 var SK_USERS='dp_users_v4';
 var currentUser=null, currentRole=null, currentDisplayName=null;
 
-// Only these accounts may EDIT or DELETE existing values (entries, party rates, payments).
-// Everyone else can still create the daily entry, but not change submitted values.
+// Aamir & Saif are the admins — the only ones who can edit the Role Permissions matrix,
+// manage users, and change core settings.
 var EDITORS=['aamir@oregenesis.onmicrosoft.com','saif@oregenesis.onmicrosoft.com'];
-function canEdit(){ return !!currentUser && EDITORS.indexOf((currentUser||'').toLowerCase())>=0; }
-function requireEdit(){ if(canEdit()) return true; showToast('🔒 Only Aamir & Saif can edit or delete values'); return false; }
+function isAdmin(){ return currentRole==='admin'; }
 
-// admin sees Entry/Today/Reports/Parties/History/Settings; staff sees all except Settings
-var ROLE_TABS={admin:[0,1,2,3,4,5], staff:[0,1,2,3,4]};
+// ── ROLE PERMISSIONS MATRIX (Admin / Operator) ────────────────────
+var PERMS=[
+  {k:'dashboard',  i:'🏠', n:'Dashboard',            d:'View home & live stats',            tab:1},
+  {k:'dailyEntry', i:'📋', n:'Daily Entry',           d:'Submit daily reports',              tab:0},
+  {k:'records',    i:'🗂️', n:'Records',               d:'View past submitted reports',       tab:4},
+  {k:'reports',    i:'📊', n:'Reports',               d:'Monthly summary & DSR',             tab:2},
+  {k:'parties',    i:'🤝', n:'Parties',               d:'View credit-party ledgers',         tab:3},
+  {k:'fuelPrices', i:'💰', n:'Fuel Prices',           d:'View & update prices'},
+  {k:'viewProfit', i:'📈', n:'View Profit',           d:'See margin & P&L data'},
+  {k:'editEntries',i:'✏️', n:'Edit / Delete Entries', d:'Change or remove submitted entries'},
+  {k:'reconcile',  i:'🏦', n:'Reconcile',             d:'Upload & match bank / BPCL statements'},
+  {k:'settings',   i:'⚙️', n:'Settings',              d:'Open the settings tab',             tab:5}
+];
+var DEFAULT_PERMS={
+  admin:    {dashboard:1,dailyEntry:1,records:1,reports:1,parties:1,fuelPrices:1,viewProfit:1,editEntries:1,reconcile:1,settings:1},
+  operator: {dashboard:1,dailyEntry:1,records:0,reports:0,parties:0,fuelPrices:0,viewProfit:0,editEntries:0,reconcile:0,settings:0}
+};
+function getRolePerms(){
+  var rp=(settings&&settings.rolePerms)||{};
+  return { admin:Object.assign({},DEFAULT_PERMS.admin,rp.admin||{}), operator:Object.assign({},DEFAULT_PERMS.operator,rp.operator||{}) };
+}
+function roleKey(){ return currentRole==='admin'?'admin':'operator'; }
+function hasPerm(key){ var rp=getRolePerms(); var r=rp[roleKey()]; return r? !!r[key] : (currentRole==='admin'); }
+function allowedTabs(){
+  var a=[]; PERMS.forEach(function(p){ if(p.tab!=null && hasPerm(p.k)) a.push(p.tab); });
+  return a.length? a.sort(function(x,y){return x-y;}) : [1];
+}
+// Entry/value editing is now permission-driven (admins can toggle it for Operators).
+function canEdit(){ return hasPerm('editEntries'); }
+function requireEdit(){ if(canEdit()) return true; showToast('🔒 You don\'t have permission to edit values'); return false; }
+function setRolePerm(role,key,val){
+  if(!isAdmin()){ showToast('🔒 Only Aamir & Saif can change permissions'); return; }
+  if(!settings.rolePerms) settings.rolePerms={};
+  if(!settings.rolePerms[role]) settings.rolePerms[role]=Object.assign({},DEFAULT_PERMS[role]);
+  settings.rolePerms[role][key]=val?1:0;
+  try{ localStorage.setItem(SS,JSON.stringify(settings)); }catch(e){}
+  if(typeof spSync!=='undefined'&&spSync.active) spSync.schedulePush();
+  applyRoleUI(); renderRolePerms();
+}
+function resetRolePerms(){
+  if(!isAdmin()){ showToast('🔒 Only Aamir & Saif can change permissions'); return; }
+  if(!confirm('Reset all role permissions to defaults?')) return;
+  settings.rolePerms=JSON.parse(JSON.stringify(DEFAULT_PERMS));
+  try{ localStorage.setItem(SS,JSON.stringify(settings)); }catch(e){}
+  if(typeof spSync!=='undefined'&&spSync.active) spSync.schedulePush();
+  applyRoleUI(); renderRolePerms(); showToast('✓ Permissions reset to defaults');
+}
+function renderRolePerms(){
+  var body=document.getElementById('rolePermsBody'); if(!body) return;
+  var rp=getRolePerms(); var editable=isAdmin();
+  var hb='padding:8px;font-size:12px;font-weight:800;color:#fff;text-align:center';
+  var head='<tr><th style="padding:8px;text-align:left;font-size:12px;color:var(--text3)">FEATURE</th>'+
+    '<th style="'+hb+';background:var(--blue);border-radius:6px 0 0 0">Admin</th>'+
+    '<th style="'+hb+';background:#0f9d8b;border-radius:0 6px 0 0">Operator</th></tr>';
+  function tog(role,p){
+    var on=!!rp[role][p.k];
+    var dis = (!editable)?'opacity:.5;pointer-events:none':'cursor:pointer';
+    return '<td style="text-align:center;padding:8px"><div onclick="setRolePerm(\''+role+'\',\''+p.k+'\','+(on?'false':'true')+')" style="'+dis+';display:inline-block;width:44px;height:24px;border-radius:12px;background:'+(on?'var(--blue)':'#cbd5e1')+';position:relative;transition:.15s"><div style="position:absolute;top:2px;left:'+(on?'22px':'2px')+';width:20px;height:20px;border-radius:50%;background:#fff;transition:.15s"></div></div></td>';
+  }
+  var rows=PERMS.map(function(p){
+    return '<tr style="border-top:1px solid var(--border)">'+
+      '<td style="padding:9px 6px"><div style="font-size:13px;font-weight:700">'+p.i+' '+p.n+'</div><div style="font-size:11px;color:var(--text3)">'+p.d+'</div></td>'+
+      tog('admin',p)+tog('operator',p)+'</tr>';
+  }).join('');
+  body.innerHTML='<div class="tbl-wrap"><table style="width:100%;border-collapse:collapse">'+head+rows+'</table></div>'+
+    (editable?'':'<p style="font-size:11px;color:var(--text3);margin-top:8px">🔒 View only — ask Aamir or Saif to change permissions.</p>');
+}
 var msalApp=null;
 
 function escHtml(s){ return String(s==null?'':s).replace(/[&<>"']/g,function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]; }); }
@@ -2170,7 +2244,7 @@ function resolveRole(){
 }
 
 function applyRoleUI(){
-  var allowed=ROLE_TABS[currentRole]||[0,1,2,3,4];
+  var allowed=allowedTabs();
   document.querySelectorAll('.bn').forEach(function(b,i){ b.style.display=allowed.indexOf(i)>=0?'':'none'; });
   var tb=document.getElementById('tbUser');
   if(tb) tb.innerHTML='<div class="tb-uname">'+escHtml(currentDisplayName)+'</div><div class="tb-urole">'+currentRole+'</div>';
