@@ -442,12 +442,24 @@ function computeEntry(e){
   var prevPtot = (pPrev.p1||0)+(pPrev.p2||0)+(pPrev.p3||0)+(pPrev.p4||0);
   var prevDtot = (dPrev.d1||0)+(dPrev.d2||0)+(dPrev.d3||0)+(dPrev.d4||0);
   function nz(cur,prev){ return (cur!=null&&!isNaN(cur)) ? cur : (prev||0); }
-  var curPtot = nz(e.p1,pPrev.p1)+nz(e.p2,pPrev.p2)+nz(e.p3,pPrev.p3)+nz(e.p4,pPrev.p4);
-  var curDtot = nz(e.d1,dPrev.d1)+nz(e.d2,dPrev.d2)+nz(e.d3,dPrev.d3)+nz(e.d4,dPrev.d4);
   // Testing fuel is drawn through the nozzles then returned to the tank — the totalizer
   // advances but it is not a sale, so subtract it from the sold litres.
-  e.pSold = Math.max(0, curPtot - prevPtot - (e.pTest||0));
-  e.dSold = Math.max(0, curDtot - prevDtot - (e.dTest||0));
+  var hasOpen = (e.p1o!=null||e.p2o!=null||e.p3o!=null||e.p4o!=null||e.d1o!=null||e.d2o!=null||e.d3o!=null||e.d4o!=null);
+  if(hasOpen){
+    // Two-phase entry: sold = closing (10PM) − opening (10AM), self-contained per day.
+    var openPtot=(+e.p1o||0)+(+e.p2o||0)+(+e.p3o||0)+(+e.p4o||0);
+    var openDtot=(+e.d1o||0)+(+e.d2o||0)+(+e.d3o||0)+(+e.d4o||0);
+    var closeP = nz(e.p1,e.p1o)+nz(e.p2,e.p2o)+nz(e.p3,e.p3o)+nz(e.p4,e.p4o);
+    var closeD = nz(e.d1,e.d1o)+nz(e.d2,e.d2o)+nz(e.d3,e.d3o)+nz(e.d4,e.d4o);
+    e.pSold = Math.max(0, closeP - openPtot - (e.pTest||0));
+    e.dSold = Math.max(0, closeD - openDtot - (e.dTest||0));
+  } else {
+    // Legacy single-reading entries: sold = today's reading − previous day's reading.
+    var curPtot = nz(e.p1,pPrev.p1)+nz(e.p2,pPrev.p2)+nz(e.p3,pPrev.p3)+nz(e.p4,pPrev.p4);
+    var curDtot = nz(e.d1,dPrev.d1)+nz(e.d2,dPrev.d2)+nz(e.d3,dPrev.d3)+nz(e.d4,dPrev.d4);
+    e.pSold = Math.max(0, curPtot - prevPtot - (e.pTest||0));
+    e.dSold = Math.max(0, curDtot - prevDtot - (e.dTest||0));
+  }
   // Cost basis with tanker
   var prevPcost = (prevNozzles&&prevNozzles.pCost) || settings.rates.pCost;
   var prevDcost = (prevNozzles&&prevNozzles.dCost) || settings.rates.dCost;
@@ -522,7 +534,7 @@ function nav(i){
   document.querySelectorAll('.page').forEach(function(p,j){ p.classList.toggle('active',i===j); });
   document.querySelectorAll('.bn').forEach(function(b,j){ b.classList.toggle('active',i===j); });
   curPage=i; window.scrollTo(0,0);
-  if(i===0) renderEntry();
+  if(i===0) initEntry();
   if(i===1) renderToday();
   if(i===2) renderReport(curRTab);
   if(i===3) renderParties();
@@ -537,12 +549,36 @@ function rTab(i,btn){
 }
 // ═══════════════════════════════════════ ENTRY FORM ══════════════
 var draft = {}; // current day's draft
-var STEPS = ['Date','Nozzles','Stock','Collections','Expenses','Review'];
+var entryEditOverride=false; // set when an editor opens an existing entry from History
+var STEPS = ['Date','Opening','AM Stock','Closing','PM Stock','Collections','Expenses','Review'];
+var ENTRY_FNS = null;
 
+// Decide morning vs evening vs locked when the Daily Entry tab opens.
+function initEntry(){
+  ENTRY_FNS = [stepDate, stepOpeningNozzles, stepMorningStock, stepClosingNozzles, stepEveningStock, stepCollections, stepExpenses, stepReview];
+  var today=todayStr();
+  if(entryEditOverride){ entryEditOverride=false; renderEntry(); return; } // editing an existing entry via History
+  var sub=entries.find(function(e){ return e.date===today && e.submitted; });
+  if(sub){ renderLockedEntry(sub); return; }
+  var prog=entries.find(function(e){ return e.date===today && !e.submitted && e.morningSaved; });
+  if(prog && draft.date!==today){ draft=JSON.parse(JSON.stringify(prog)); curStep=3; }        // resume at evening
+  else if(draft.date!==today){ draft={date:today,reporter:'',expenses:[]}; curStep=0; }         // fresh morning
+  renderEntry();
+}
+function renderLockedEntry(e){
+  document.getElementById('stepBar').innerHTML='';
+  document.getElementById('entryContent').innerHTML=
+    '<div class="card" style="text-align:center;padding:26px">'+
+    '<div style="font-size:38px">✅</div>'+
+    '<div style="font-size:16px;font-weight:800;margin:8px 0 4px">Today\'s entry is complete</div>'+
+    '<div style="font-size:13px;color:var(--text3)">'+fmtDate(e.date)+' · HSD '+fL(e.dSold)+' · MS '+fL(e.pSold)+' · '+inr(e.totalRev)+'</div>'+
+    '<div style="font-size:12px;color:var(--text3);margin-top:12px">Data entry is once per day. '+(canEdit()?'To correct it, open <b>History → '+fmtDate(e.date)+'</b>.':'To change it, ask Aamir or Saif.')+'</div>'+
+    '<button class="btn btn-outline" style="margin-top:14px" onclick="nav(1)">View today\'s summary</button></div>';
+}
 function renderEntry(){
   renderStepBar();
-  var fn = [stepDate, stepNozzles, stepStock, stepCollections, stepExpenses, stepReview];
-  document.getElementById('entryContent').innerHTML = fn[curStep]();
+  if(!ENTRY_FNS) ENTRY_FNS = [stepDate, stepOpeningNozzles, stepMorningStock, stepClosingNozzles, stepEveningStock, stepCollections, stepExpenses, stepReview];
+  document.getElementById('entryContent').innerHTML = ENTRY_FNS[curStep]();
   attachExpenseHandlers();
 }
 function renderStepBar(){
@@ -558,91 +594,106 @@ function stepDate(){
   if(!draft.date) draft.date=today;
   if(!draft.reporter) draft.reporter='';
   return '<div class="card"><div class="card-title">📅 Step 1 — Date & Reporter</div>'+
-    (existing?'<div class="alert alert-a">⚠ An entry for today already exists. Submitting again will overwrite it.</div>':'')+
+    '<div class="alert alert-b" style="font-size:11px;margin-bottom:10px">Morning: enter the 10 AM opening nozzle readings + morning stock, then <b>Save morning</b>. Come back in the evening to finish (closing readings, 10 PM stock, collections, expenses).</div>'+
     '<div class="field"><label>Date</label><input type="date" id="e-date" value="'+draft.date+'" max="'+today+'"/></div>'+
     '<div class="field"><label>Reported by</label><select id="e-reporter">'+
       ['Shiban','Ganesh','Manager','Mustafa Bhai','Other'].map(function(n){ return '<option'+(draft.reporter===n?' selected':'')+'>'+n+'</option>'; }).join('')+
     '</select></div></div>'+
-    '<button class="btn btn-blue" onclick="saveDraft0();goStep(1)">Next — Nozzle Readings →</button>';
+    '<button class="btn btn-blue" onclick="saveDraft0();goStep(1)">Next — Opening Readings (10 AM) →</button>';
 }
 function saveDraft0(){
   draft.date=document.getElementById('e-date').value;
   draft.reporter=document.getElementById('e-reporter').value;
 }
 
-function stepNozzles(){
-  var prev = getPrev(draft.date);
-  var prevP = prev&&prev.type==='daily'?prev:settings.baseline;
-  var prevD = prev&&prev.type==='daily'?prev:settings.baseline;
-  function nzBlock(id,label,prevVal){
-    var v = draft[id]!==undefined ? draft[id] : '';
-    var sold = (v!==''&&prevVal) ? Math.max(0,parseFloat(v)-prevVal).toFixed(1) : '—';
-    return '<div class="nz-block">'+
-      '<div class="nz-title">'+label+'</div>'+
-      '<div class="grid2">'+
-        '<div class="field"><label>Previous</label><input type="number" step="0.01" value="'+prevVal.toFixed(2)+'" disabled style="background:#f5f5f5;color:var(--text3)"/></div>'+
-        '<div class="field"><label>Today\'s reading</label><input type="number" id="e-'+id+'" step="0.01" value="'+v+'" placeholder="'+prevVal.toFixed(2)+'" oninput="updNz(\''+id+'\','+prevVal+')"/></div>'+
-      '</div>'+
-      '<div class="nz-sold" id="nz-'+id+'">Sold today: <b>'+sold+' L</b></div></div>';
-  }
-  return '<div class="card"><div class="card-title">⛽ Step 2 — MS (Petrol) Nozzles</div>'+
-    nzBlock('p3','🟡 P3 (Main petrol nozzle)',prevP.p3||0)+
-    nzBlock('p4','🟡 P4 (Petrol nozzle)',prevP.p4||0)+
-    '<div style="font-size:11px;color:var(--text3);margin:-4px 0 8px">P1 & P2 rarely change — tap to edit if needed</div>'+
-    '<details><summary style="font-size:12px;color:var(--blue);cursor:pointer;margin-bottom:8px">Show P1 & P2</summary>'+
-    nzBlock('p1','P1 (Petrol)',prevP.p1||0)+nzBlock('p2','P2 (Petrol)',prevP.p2||0)+
-    '</details></div>'+
-    '<div class="card"><div class="card-title">🔵 Step 2 — HSD (Diesel) Nozzles</div>'+
-    nzBlock('d1','🔵 D1 (Main diesel nozzle)',prevD.d1||0)+
-    nzBlock('d2','🔵 D2 (Diesel nozzle)',prevD.d2||0)+
-    '<details><summary style="font-size:12px;color:var(--blue);cursor:pointer;margin-bottom:8px">Show D3 & D4</summary>'+
-    nzBlock('d3','D3 (Diesel)',prevD.d3||0)+nzBlock('d4','D4 (Diesel)',prevD.d4||0)+
-    '</details></div>'+
-    '<div class="card"><div class="card-title">🧪 Step 2 — Testing (returned to tank)</div>'+
-    '<div class="alert alert-b" style="font-size:11px;margin-bottom:10px">Litres drawn through the nozzles for testing and poured back into the tank. This is <b>not a sale</b>, so it is subtracted from today\'s sold litres.</div>'+
+// STEP 2 — Opening nozzle readings (10 AM), stored as p1o..p4o / d1o..d4o
+function stepOpeningNozzles(){
+  var prev=getPrev(draft.date); var pv=(prev&&prev.type==='daily')?prev:settings.baseline;
+  function blk(base,label){ var k=base+'o'; var ref=(pv[base]!=null?+pv[base]:0); var v=(draft[k]!=null&&draft[k]!=='')?draft[k]:'';
+    return '<div class="nz-block"><div class="nz-title">'+label+'</div><div class="grid2">'+
+      '<div class="field"><label>Yesterday close</label><input type="number" value="'+ref.toFixed(2)+'" disabled style="background:#f5f5f5;color:var(--text3)"/></div>'+
+      '<div class="field"><label>Opening (10 AM)</label><input type="number" step="0.01" id="e-'+k+'" value="'+v+'" placeholder="'+ref.toFixed(2)+'"/></div>'+
+      '</div></div>'; }
+  return '<div class="card"><div class="card-title">⛽ Step 2 — Opening Nozzles (10 AM) · MS</div>'+
+    blk('p3','🟡 P3 (Main petrol)')+blk('p4','🟡 P4 (Petrol)')+
+    '<details><summary style="font-size:12px;color:var(--blue);cursor:pointer;margin-bottom:8px">Show P1 & P2</summary>'+blk('p1','P1')+blk('p2','P2')+'</details></div>'+
+    '<div class="card"><div class="card-title">🔵 Step 2 — Opening Nozzles (10 AM) · HSD</div>'+
+    blk('d1','🔵 D1 (Main diesel)')+blk('d2','🔵 D2 (Diesel)')+
+    '<details><summary style="font-size:12px;color:var(--blue);cursor:pointer;margin-bottom:8px">Show D3 & D4</summary>'+blk('d3','D3')+blk('d4','D4')+'</details></div>'+
+    '<div style="display:flex;gap:8px">'+
+    '<button class="btn btn-outline" style="width:auto;padding:13px 20px" onclick="saveOpen();goStep(0)">← Back</button>'+
+    '<button class="btn btn-blue" style="flex:1" onclick="saveOpen();goStep(2)">Next — Morning Stock →</button></div>';
+}
+function saveOpen(){ ['p1','p2','p3','p4','d1','d2','d3','d4'].forEach(function(b){ var el=document.getElementById('e-'+b+'o'); if(el){ var v=parseFloat(el.value); if(!isNaN(v)) draft[b+'o']=v; } }); }
+
+// STEP 4 — Closing nozzle readings (10 PM) + testing; sold = closing − opening
+function stepClosingNozzles(){
+  function blk(base,label){ var op=(draft[base+'o']!=null?+draft[base+'o']:0); var v=(draft[base]!=null&&draft[base]!=='')?draft[base]:'';
+    var sold=(v!==''?Math.max(0,parseFloat(v)-op).toFixed(1):'—');
+    return '<div class="nz-block"><div class="nz-title">'+label+'</div><div class="grid2">'+
+      '<div class="field"><label>Opening (10 AM)</label><input type="number" value="'+op.toFixed(2)+'" disabled style="background:#f5f5f5;color:var(--text3)"/></div>'+
+      '<div class="field"><label>Closing (10 PM)</label><input type="number" step="0.01" id="e-'+base+'" value="'+v+'" placeholder="'+op.toFixed(2)+'" oninput="updClose(\''+base+'\','+op+')"/></div>'+
+      '</div><div class="nz-sold" id="nz-'+base+'">Sold: <b>'+sold+' L</b></div></div>'; }
+  return '<div class="card"><div class="card-title">⛽ Step 4 — Closing Nozzles (10 PM) · MS</div>'+
+    blk('p3','🟡 P3')+blk('p4','🟡 P4')+
+    '<details><summary style="font-size:12px;color:var(--blue);cursor:pointer;margin-bottom:8px">Show P1 & P2</summary>'+blk('p1','P1')+blk('p2','P2')+'</details></div>'+
+    '<div class="card"><div class="card-title">🔵 Step 4 — Closing Nozzles (10 PM) · HSD</div>'+
+    blk('d1','🔵 D1')+blk('d2','🔵 D2')+
+    '<details><summary style="font-size:12px;color:var(--blue);cursor:pointer;margin-bottom:8px">Show D3 & D4</summary>'+blk('d3','D3')+blk('d4','D4')+'</details></div>'+
+    '<div class="card"><div class="card-title">🧪 Step 4 — Testing (returned to tank)</div>'+
+    '<div class="alert alert-b" style="font-size:11px;margin-bottom:10px">Litres drawn for testing and poured back into the tank — not a sale, so subtracted from sold.</div>'+
     '<div class="grid2">'+
     '<div class="field"><label>MS test (L)</label><input type="number" step="0.01" id="e-pTest" value="'+(draft.pTest!=null?draft.pTest:'')+'" placeholder="0"/></div>'+
     '<div class="field"><label>HSD test (L)</label><input type="number" step="0.01" id="e-dTest" value="'+(draft.dTest!=null?draft.dTest:'')+'" placeholder="0"/></div>'+
     '</div></div>'+
     '<div style="display:flex;gap:8px">'+
-    '<button class="btn btn-outline" style="width:auto;padding:13px 20px" onclick="saveDraft1();goStep(0)">← Back</button>'+
-    '<button class="btn btn-blue" style="flex:1" onclick="saveDraft1();goStep(2)">Next — Stock Check →</button></div>';
+    '<button class="btn btn-outline" style="width:auto;padding:13px 20px" onclick="saveClosing();goStep(2)">← Back</button>'+
+    '<button class="btn btn-blue" style="flex:1" onclick="saveClosing();goStep(4)">Next — Evening Stock →</button></div>';
 }
-function updNz(id, prev){ var v=parseFloat(document.getElementById('e-'+id).value); var el=document.getElementById('nz-'+id); if(!isNaN(v)&&prev){ var s=Math.max(0,v-prev); el.innerHTML='Sold today: <b '+( s>0?'style="color:var(--green)"':'')+'>'+s.toFixed(1)+' L</b>'; }else{ el.innerHTML='Sold today: <b>—</b>'; }}
-function saveDraft1(){
-  ['p1','p2','p3','p4','d1','d2','d3','d4'].forEach(function(k){
-    var el=document.getElementById('e-'+k); if(el){ var v=parseFloat(el.value); if(!isNaN(v)) draft[k]=v; }
-  });
-  ['pTest','dTest'].forEach(function(k){
-    var el=document.getElementById('e-'+k); if(el){ var v=parseFloat(el.value); draft[k]=isNaN(v)?0:v; }
-  });
+function updClose(base,op){ var el0=document.getElementById('e-'+base); var v=parseFloat(el0.value); var el=document.getElementById('nz-'+base); if(!isNaN(v)){ var s=Math.max(0,v-op); el.innerHTML='Sold: <b '+(s>0?'style="color:var(--green)"':'')+'>'+s.toFixed(1)+' L</b>'; } else el.innerHTML='Sold: <b>—</b>'; }
+function saveClosing(){
+  ['p1','p2','p3','p4','d1','d2','d3','d4'].forEach(function(k){ var el=document.getElementById('e-'+k); if(el){ var v=parseFloat(el.value); if(!isNaN(v)) draft[k]=v; } });
+  ['pTest','dTest'].forEach(function(k){ var el=document.getElementById('e-'+k); if(el){ var v=parseFloat(el.value); draft[k]=isNaN(v)?0:v; } });
 }
 
-function stepStock(){
-  function stockInput(id,label,val){ return '<div class="field"><label>'+label+'</label><input type="number" id="e-'+id+'" step="0.01" value="'+(val!==undefined&&val!==null?val:'')+'" placeholder="0"/></div>'; }
+function stockInput(id,label,val){ return '<div class="field"><label>'+label+'</label><input type="number" id="e-'+id+'" step="0.01" value="'+(val!==undefined&&val!==null&&val!==''?val:'')+'" placeholder="0"/></div>'; }
+// STEP 3 — Morning stock (10 AM) + the "Save morning, finish later" action
+function stepMorningStock(){
   return '<div class="card"><div class="card-title">☀️ Step 3 — Morning Stock (10 AM)</div>'+
     '<div class="grid2">'+
     stockInput('pAutoAM','MS Auto (L)',draft.pAutoAM)+stockInput('pAM','MS Dip (L)',draft.pAM)+
     stockInput('dAutoAM','HSD Auto (L)',draft.dAutoAM)+stockInput('dAM','HSD Dip (L)',draft.dAM)+
     '</div></div>'+
-    '<div class="card"><div class="card-title">🌙 Step 3 — Evening Stock (10 PM)</div>'+
+    '<div style="display:flex;gap:8px">'+
+    '<button class="btn btn-outline" style="width:auto;padding:13px 20px" onclick="saveMorningStock();goStep(1)">← Back</button>'+
+    '<button class="btn btn-blue" style="flex:1" onclick="saveMorningStock();goStep(3)">Continue to evening →</button></div>'+
+    '<button class="btn btn-green" style="margin-top:8px;width:100%" onclick="saveMorning()">💾 Save morning &amp; finish later</button>';
+}
+function saveMorningStock(){ ['pAutoAM','pAM','dAutoAM','dAM'].forEach(function(k){ var el=document.getElementById('e-'+k); if(el){ var v=parseFloat(el.value); draft[k]=isNaN(v)?null:v; } }); }
+function saveMorning(){
+  saveMorningStock();
+  draft.morningSaved=true; draft.submitted=false; draft.type='daily'; if(!draft.reporter) draft.reporter='';
+  draft.savedAt=new Date().toISOString();
+  var e=JSON.parse(JSON.stringify(draft));
+  entries=entries.filter(function(x){ return x.date!==e.date; });
+  entries.push(e); entries.sort(function(a,b){ return a.date.localeCompare(b.date); });
+  saveEntries();
+  showToast('✓ Morning saved for '+fmtDate(e.date)+' — finish this evening');
+  setTimeout(function(){ nav(1); },700);
+}
+// STEP 5 — Evening stock (10 PM)
+function stepEveningStock(){
+  setTimeout(function(){ ['pPM','pAutoPM','dPM','dAutoPM'].forEach(function(k){ var el=document.getElementById('e-'+k); if(el) el.addEventListener('input',updateSFAlerts); }); },50);
+  return '<div class="card"><div class="card-title">🌙 Step 5 — Evening Stock (10 PM)</div>'+
     '<div class="grid2">'+
     stockInput('pAutoPM','MS Auto (L)',draft.pAutoPM)+stockInput('pPM','MS Dip (L)',draft.pPM)+
     stockInput('dAutoPM','HSD Auto (L)',draft.dAutoPM)+stockInput('dPM','HSD Dip (L)',draft.dPM)+
-    '</div></div>'+
+    '</div><div id="sfAlerts" style="margin-top:8px"></div></div>'+
     '<div style="display:flex;gap:8px">'+
-    '<div id="sfAlerts"></div>'+
-    '<button class="btn btn-outline" style="width:auto;padding:13px 20px" onclick="saveDraft2();goStep(1)">← Back</button>'+
-    '<button class="btn btn-blue" style="flex:1" onclick="saveDraft2();goStep(3)">Next — Collections →</button></div>';
-  // Attach live shortfall checking after render
-  setTimeout(function(){
-    var inputs=['pAM','pAutoAM','dAM','dAutoAM','pPM','pAutoPM','dPM','dAutoPM'];
-    inputs.forEach(function(k){
-      var el=document.getElementById('e-'+k);
-      if(el) el.addEventListener('input',updateSFAlerts);
-    });
-  },50);
+    '<button class="btn btn-outline" style="width:auto;padding:13px 20px" onclick="saveEveningStock();goStep(3)">← Back</button>'+
+    '<button class="btn btn-blue" style="flex:1" onclick="saveEveningStock();goStep(5)">Next — Collections →</button></div>';
 }
+function saveEveningStock(){ ['pAutoPM','pPM','dAutoPM','dPM'].forEach(function(k){ var el=document.getElementById('e-'+k); if(el){ var v=parseFloat(el.value); draft[k]=isNaN(v)?null:v; } }); }
 function updateSFAlerts(){
   var get=function(id){ var el=document.getElementById('e-'+id); return el?parseFloat(el.value):NaN; };
   var checks=[
@@ -654,12 +705,6 @@ function updateSFAlerts(){
   var el=document.getElementById('sfAlerts');
   if(el) el.innerHTML=shortfallAlertHTML(checks);
 }
-function saveDraft2(){
-  ['pAutoAM','pAM','dAutoAM','dAM','pAutoPM','pPM','dAutoPM','dPM'].forEach(function(k){
-    var el=document.getElementById('e-'+k); if(el){ var v=parseFloat(el.value); draft[k]=isNaN(v)?null:v; }
-  });
-}
-
 function stepCollections(){
   function ci(id,label,val){ return '<div class="field"><label>'+label+'</label><input type="number" id="e-'+id+'" step="0.01" value="'+(val==null||isNaN(val)?'':val)+'" placeholder="0"/></div>'; }
   var _parties=getParties(); var _fl=draft.fleetLitresBreakdown||{}; var _fr=draft.fleetRateBreakdown||{};
@@ -709,8 +754,8 @@ function stepCollections(){
     ci('dSell','HSD Sell ₹/L',draft.dSell||settings.rates.dSell)+
     '</div><p style="font-size:11px;color:var(--text3);margin-top:4px">Update only if BPCL has changed rates today.</p></div>'+
     '<div style="display:flex;gap:8px">'+
-    '<button class="btn btn-outline" style="width:auto;padding:13px 20px" onclick="saveDraft3();goStep(2)">← Back</button>'+
-    '<button class="btn btn-blue" style="flex:1" onclick="saveDraft3();goStep(4)">Next — Expenses →</button></div>';
+    '<button class="btn btn-outline" style="width:auto;padding:13px 20px" onclick="saveDraft3();goStep(4)">← Back</button>'+
+    '<button class="btn btn-blue" style="flex:1" onclick="saveDraft3();goStep(6)">Next — Expenses →</button></div>';
 }
 function saveDraft3(){
   ['cash','upi','swipe','pRcvd','pBuy','dRcvd','dBuy','pSell','dSell'].forEach(function(k){
@@ -766,8 +811,8 @@ function stepExpenses(){
     '</div>'+
     '<button class="btn btn-outline" onclick="addExp()">+ Add</button></div>'+
     '<div style="display:flex;gap:8px">'+
-    '<button class="btn btn-outline" style="width:auto;padding:13px 20px" onclick="goStep(3)">← Back</button>'+
-    '<button class="btn btn-blue" style="flex:1" onclick="goStep(5)">Next — Review →</button></div>';
+    '<button class="btn btn-outline" style="width:auto;padding:13px 20px" onclick="goStep(5)">← Back</button>'+
+    '<button class="btn btn-blue" style="flex:1" onclick="goStep(7)">Next — Review →</button></div>';
 }
 function attachExpenseHandlers(){}
 function addExp(){
@@ -818,7 +863,7 @@ function stepReview(){
     (e.dRcvd>0?'<div class="vrow"><span class="vl">HSD received</span><span class="vv ok">'+fL(e.dRcvd)+' @ ₹'+e.dBuy+'/L</span></div>':'')+
     '</div>':'')+
     '<div style="display:flex;gap:8px">'+
-    '<button class="btn btn-outline" style="width:auto;padding:13px 20px" onclick="goStep(4)">← Back</button>'+
+    '<button class="btn btn-outline" style="width:auto;padding:13px 20px" onclick="goStep(6)">← Back</button>'+
     '<button class="btn btn-green" style="flex:1" onclick="submitEntry()">✅ Submit Entry</button></div>'+
     '<button class="btn btn-wa" onclick="shareWA()" style="margin-top:8px">📋 Copy for WhatsApp</button>';
 }
@@ -1605,7 +1650,7 @@ function loadForEdit(date){
   if(!requireEdit()) return;
   var e=entries.find(function(x){ return x.date===date; });
   if(!e) return;
-  draft=JSON.parse(JSON.stringify(e)); curStep=0;
+  draft=JSON.parse(JSON.stringify(e)); curStep=0; entryEditOverride=true;
   document.getElementById('detailModal').classList.add('hidden');
   nav(0);
 }
