@@ -26,6 +26,9 @@ body{font-family:var(--font);background:var(--bg);color:var(--text);font-size:14
 .bn.active .bn-label{color:var(--blue)}
 /* PAGES */
 .page{display:none;max-width:680px;margin:0 auto;padding:14px}
+/* Wider layout on tablets/desktops so tables (DSR, Cash Match, registers) fit without horizontal scroll */
+@media(min-width:760px){ .page{max-width:1000px} }
+@media(min-width:1100px){ .page{max-width:1200px} }
 .page.active{display:block}
 /* CARD */
 .card{background:var(--bg2);border:1.5px solid var(--border);border-radius:12px;padding:16px;margin-bottom:12px;box-shadow:0 2px 8px rgba(1,125,197,.06)}
