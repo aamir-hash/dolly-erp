@@ -255,6 +255,7 @@ tr.hi-row td{background:rgba(255,220,2,.06)}
     <button class="rtab" onclick="rTab(3,this)">All-time</button>
     <button class="rtab" onclick="rTab(4,this)">🔍 Check</button>
     <button class="rtab" onclick="rTab(5,this)">🏦 Reconcile</button>
+    <button class="rtab" onclick="rTab(6,this)">📋 DSR</button>
   </div>
   <div id="reportContent"></div>
 </div>
@@ -911,7 +912,65 @@ function renderReport(tab){
   else if(tab===2) renderMonthlyReport();
   else if(tab===4) renderCheckReport();
   else if(tab===5) renderReconcile();
+  else if(tab===6) renderDSR();
   else renderAllTime();
+}
+
+// ── DSR — DAILY STOCK REGISTER (MS + HSD) ─────────────────────────
+var dsrMonth = todayStr().slice(0,7);
+function dsrRegisterHtml(list, fuel, title){
+  // fuel prefix 'd' (HSD) or 'p' (MS). Sale = raw nozzle-meter throughput (sold + testing).
+  var A=fuel+'AutoAM', R=fuel+'Rcvd', CA=fuel+'AutoPM', DIP=fuel+'PM', SOLD=fuel+'Sold', TEST=fuel+'Test';
+  var T={oa:0,rec:0,orr:0,sale:0,ca:0,dip:0,vari:0};
+  function n0(v){ return Math.round(v||0).toLocaleString('en-IN'); }
+  function n1(v){ return (Math.round((v||0)*10)/10).toLocaleString('en-IN'); }
+  var body=list.map(function(e){
+    var oa=+e[A]||0, rec=+e[R]||0, sale=(+e[SOLD]||0)+(+e[TEST]||0), ca=+e[CA]||0, dip=+e[DIP]||0;
+    var orr=oa+rec, vari=orr-sale-dip;
+    T.oa+=oa;T.rec+=rec;T.orr+=orr;T.sale+=sale;T.ca+=ca;T.dip+=dip;T.vari+=vari;
+    var vc=vari<0?'#c0392b':'#1e7d34';
+    var td='padding:7px 10px;border-bottom:1px solid var(--border);font-size:12px;text-align:right;font-family:var(--mono)';
+    return '<tr>'+
+      '<td style="padding:7px 10px;border-bottom:1px solid var(--border);font-size:12px;font-weight:700">'+e.date.slice(8)+' '+new Date(e.date).toLocaleDateString("en-IN",{month:"short"})+'</td>'+
+      '<td style="'+td+'">'+n0(oa)+'</td><td style="'+td+'">'+n0(rec)+'</td>'+
+      '<td style="'+td+';font-weight:700">'+n0(orr)+'</td>'+
+      '<td style="'+td+';color:var(--blue)">'+n1(sale)+'</td>'+
+      '<td style="'+td+'">'+n0(ca)+'</td><td style="'+td+'">'+n0(dip)+'</td>'+
+      '<td style="'+td+';color:'+vc+';font-weight:700">'+n1(vari)+'</td></tr>';
+  }).join('');
+  var tvc=T.vari<0?'#c0392b':'#1e7d34';
+  var tdT='padding:9px 10px;border-top:2px solid var(--blue);font-size:12px;text-align:right;font-weight:800;font-family:var(--mono)';
+  var totalRow='<tr style="background:var(--bg2)">'+
+    '<td style="padding:9px 10px;border-top:2px solid var(--blue);font-size:12px;font-weight:800">TOTAL</td>'+
+    '<td style="'+tdT+'">'+n0(T.oa)+'</td><td style="'+tdT+'">'+n0(T.rec)+'</td><td style="'+tdT+'">'+n0(T.orr)+'</td>'+
+    '<td style="'+tdT+';color:var(--blue)">'+n1(T.sale)+'</td><td style="'+tdT+'">'+n0(T.ca)+'</td><td style="'+tdT+'">'+n0(T.dip)+'</td>'+
+    '<td style="'+tdT+';color:'+tvc+'">'+n1(T.vari)+'</td></tr>';
+  var hb='padding:8px 10px;font-size:11px;font-weight:700;color:#fff;text-align:right;line-height:1.25';
+  var hb0='padding:8px 10px;font-size:11px;font-weight:700;color:#fff;text-align:left';
+  var head='<tr style="background:var(--blue)">'+
+    '<th style="'+hb0+'">DATE</th>'+
+    '<th style="'+hb+'">OPENING AUTO<br>(10AM)</th>'+
+    '<th style="'+hb+'">RECEIVED<br>STOCK</th>'+
+    '<th style="'+hb+'">OPENING +<br>RECEIVED</th>'+
+    '<th style="'+hb+'">ACTUAL SALE<br>(NOZZLE METERS)</th>'+
+    '<th style="'+hb+'">CLOSING AUTO<br>(10PM)</th>'+
+    '<th style="'+hb+'">ACTUAL DIP<br>(END OF DAY)</th>'+
+    '<th style="'+hb+'">STOCK<br>VARIATION</th></tr>';
+  return '<div class="card"><div class="card-title">'+title+'</div>'+
+    '<div class="tbl-wrap"><table style="width:100%;border-collapse:collapse;min-width:760px">'+
+    '<thead>'+head+'</thead><tbody>'+(body||'<tr><td colspan="8" style="text-align:center;color:var(--text3);padding:16px">No entries this month</td></tr>')+totalRow+'</tbody></table></div></div>';
+}
+function renderDSR(){
+  var months=[...new Set(entries.filter(function(e){ return e.submitted; }).map(function(e){ return e.date.slice(0,7); }))].sort().reverse();
+  if(months.indexOf(dsrMonth)<0&&months.length) dsrMonth=months[0];
+  var list=entries.filter(function(e){ return e.submitted && e.date.slice(0,7)===dsrMonth; }).sort(function(a,b){ return a.date.localeCompare(b.date); });
+  var mn=new Date(dsrMonth+'-01').toLocaleDateString('en-IN',{month:'long',year:'numeric'}).toUpperCase();
+  var el=document.getElementById('reportContent');
+  el.innerHTML='<div class="rtabs" style="margin-bottom:12px">'+
+    months.map(function(m){ return '<button class="rtab'+(m===dsrMonth?' active':'')+'" onclick="dsrMonth=\''+m+'\';renderDSR()">'+new Date(m+'-01').toLocaleDateString('en-IN',{month:'short',year:'2-digit'})+'</button>'; }).join('')+'</div>'+
+    '<p style="font-size:11px;color:var(--text3);margin-bottom:10px">Stock variation = (Opening Auto + Received) − Nozzle Sale − Actual Dip. Negative = shortfall vs book.</p>'+
+    dsrRegisterHtml(list,'d','🛢️ HSD DIESEL — DSR REGISTER — '+mn)+
+    dsrRegisterHtml(list,'p','⛽ MS PETROL — DSR REGISTER — '+mn);
 }
 
 // ── STATEMENT RECONCILIATION (upload BPCL / bank) ─────────────────
