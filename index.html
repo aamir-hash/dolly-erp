@@ -417,6 +417,16 @@ function creditRate(partyName, e){
   var p=getParties().find(function(x){ return x.name===partyName; });
   return (p&&p.hsdRate)||(e&&e.dSell)||settings.rates.dSell||0;
 }
+// Petrol credit rate: Aamir at petrol COST (pCost), others at Shiban's entered petrol rate
+// (fleetPetrolRateBreakdown), else the party's saved msRate, else day's petrol sell.
+function creditRatePetrol(partyName, e){
+  if(partyName==='AAMIR TRANSPORT') return (e&&e.pCost)||settings.rates.pBuy||0;
+  if(e&&e.fleetPetrolRateBreakdown&&e.fleetPetrolRateBreakdown[partyName]!=null&&e.fleetPetrolRateBreakdown[partyName]!==''){
+    var r=parseFloat(e.fleetPetrolRateBreakdown[partyName]); if(!isNaN(r)&&r>0) return r;
+  }
+  var p=getParties().find(function(x){ return x.name===partyName; });
+  return (p&&p.msRate)||(e&&e.pSell)||settings.rates.pSell||0;
+}
 function computeEntry(e){
   if(e.type==='import'){ 
     e.totalColl=(e.cash||0)+(e.upi||0)+(e.swipe||0)+(e.fleet||0);
@@ -459,14 +469,23 @@ function computeEntry(e){
   // creditAdj re-values those litres from the retail sell rate to their billed rate, so both
   // revenue and gross margin reflect reality (Aamir contributes zero margin, others their rate).
   e.creditAdj=0;
-  if(e.fleetLitresBreakdown){
+  if(e.fleetLitresBreakdown || e.fleetPetrolLitresBreakdown){
     var _fbR={}, _tot=0, _adj=0;
-    Object.keys(e.fleetLitresBreakdown).forEach(function(pn){
+    // Diesel credit
+    Object.keys(e.fleetLitresBreakdown||{}).forEach(function(pn){
       var lit=parseFloat(e.fleetLitresBreakdown[pn])||0; if(!lit) return;
       var rate=creditRate(pn,e);
-      var val=Math.round(lit*rate*100)/100; _fbR[pn]=val; _tot+=val;
+      _fbR[pn]=(_fbR[pn]||0)+lit*rate; _tot+=lit*rate;
       _adj += lit*(rate - (e.dSell||0));
     });
+    // Petrol credit
+    Object.keys(e.fleetPetrolLitresBreakdown||{}).forEach(function(pn){
+      var lit=parseFloat(e.fleetPetrolLitresBreakdown[pn])||0; if(!lit) return;
+      var rate=creditRatePetrol(pn,e);
+      _fbR[pn]=(_fbR[pn]||0)+lit*rate; _tot+=lit*rate;
+      _adj += lit*(rate - (e.pSell||0));
+    });
+    Object.keys(_fbR).forEach(function(k){ _fbR[k]=Math.round(_fbR[k]*100)/100; });
     e.fleetBreakdown=_fbR; e.fleet=Math.round(_tot*100)/100; e.creditAdj=Math.round(_adj*100)/100;
   }
   // Collections
@@ -653,6 +672,17 @@ function stepCollections(){
       '</div></div>';
   }).join('');
   var _iL=0,_iR=0; Object.keys(_fl).forEach(function(pn){ var l=parseFloat(_fl[pn])||0; _iL+=l; _iR+=l*creditRate(pn,draft); });
+  var _pl=draft.fleetPetrolLitresBreakdown||{}; var _pr=draft.fleetPetrolRateBreakdown||{};
+  var _petrolRows=_parties.map(function(p,i){
+    var lv=_pl[p.name]; var isA=(p.name==='AAMIR TRANSPORT');
+    var rv = isA ? '' : (_pr[p.name]!=null&&_pr[p.name]!==''?_pr[p.name]:(p.msRate||''));
+    return '<div style="margin-bottom:8px"><div style="font-size:12px;font-weight:700;color:var(--text2);margin-bottom:3px">'+escHtml(p.name)+(isA?' · at cost':'')+'</div>'+
+      '<div class="grid2">'+
+      '<div class="field" style="margin:0"><input type="number" id="e-pfleetp-'+i+'" step="0.01" value="'+(lv==null||isNaN(lv)?'':lv)+'" placeholder="Petrol litres" oninput="updFleetTotal()"/></div>'+
+      (isA? '<div class="field" style="margin:0"><input type="text" value="@ cost" disabled style="background:#f5f5f5;color:var(--text3);text-align:center"/></div>'
+          : '<div class="field" style="margin:0"><input type="number" id="e-pfleetr-'+i+'" step="0.01" value="'+rv+'" placeholder="Rate ₹/L" oninput="updFleetTotal()"/></div>')+
+      '</div></div>';
+  }).join('');
   return '<div class="card"><div class="card-title">💳 Step 4 — Collections</div>'+
     '<div class="grid2">'+
     ci('cash','Cash (₹)',draft.cash)+ci('upi','UPI / PhonePe (₹)',draft.upi)+
@@ -661,6 +691,9 @@ function stepCollections(){
     '<div class="card"><div class="card-title">🚛 Credit Sales by Party</div>'+
     '<div class="alert alert-b" style="font-size:11px;margin-bottom:10px">Enter diesel <b>litres</b> given on credit to each party. Aamir Transport is billed at <b>cost</b> automatically; for the others enter the <b>rate ₹/L</b> (defaults to their usual rate — change it if today\'s credit rate is different). Leave blank if none.</div>'+
     _fleetRows+
+    '<details style="margin-top:6px"><summary style="font-size:12px;color:var(--blue);cursor:pointer;font-weight:600">⛽ Petrol credit (if any)</summary>'+
+    '<div style="font-size:11px;color:var(--text3);margin:6px 0 8px">Petrol given on credit — Aamir at cost, others at their petrol rate.</div>'+
+    _petrolRows+'</details>'+
     '<div class="vrow"><span class="vl" style="font-weight:700">Total credit</span><span class="vv" id="fleetTotalLbl">'+(Math.round(_iL*10)/10)+' L ≈ '+inr(_iR)+'</span></div></div>'+
     '<div class="card"><div class="card-title">🚛 Tanker Delivery (if any)</div>'+
     '<div class="alert alert-b" style="margin-bottom:10px;font-size:11px">Enter litres received from tanker today. Leave 0 if no delivery.</div>'+
@@ -681,23 +714,33 @@ function saveDraft3(){
   ['cash','upi','swipe','pRcvd','pBuy','dRcvd','dBuy','pSell','dSell'].forEach(function(k){
     var el=document.getElementById('e-'+k); if(el){ var v=parseFloat(el.value); draft[k]=isNaN(v)?0:v; }
   });
-  var _parties=getParties(); var _fl={}, _fr={};
+  var _parties=getParties(); var _fl={}, _fr={}, _pl={}, _prr={};
   _parties.forEach(function(p,i){
     var el=document.getElementById('e-fleetp-'+i); if(el){ var v=parseFloat(el.value); if(!isNaN(v)&&v!==0){ _fl[p.name]=v; } }
     var er=document.getElementById('e-fleetr-'+i); if(er){ var rv=parseFloat(er.value); if(!isNaN(rv)&&rv>0){ _fr[p.name]=rv; } }
+    var pe=document.getElementById('e-pfleetp-'+i); if(pe){ var pv=parseFloat(pe.value); if(!isNaN(pv)&&pv!==0){ _pl[p.name]=pv; } }
+    var pr=document.getElementById('e-pfleetr-'+i); if(pr){ var prv=parseFloat(pr.value); if(!isNaN(prv)&&prv>0){ _prr[p.name]=prv; } }
   });
   draft.fleetLitresBreakdown=_fl; draft.fleetRateBreakdown=_fr;
+  draft.fleetPetrolLitresBreakdown=_pl; draft.fleetPetrolRateBreakdown=_prr;
   // provisional ₹ (computeEntry finalizes using the day's actual cost)
   var _fb={}, _tot=0;
-  Object.keys(_fl).forEach(function(pn){ var val=Math.round(_fl[pn]*creditRate(pn,draft)*100)/100; _fb[pn]=val; _tot+=val; });
+  Object.keys(_fl).forEach(function(pn){ var val=_fl[pn]*creditRate(pn,draft); _fb[pn]=(_fb[pn]||0)+val; _tot+=val; });
+  Object.keys(_pl).forEach(function(pn){ var val=_pl[pn]*creditRatePetrol(pn,draft); _fb[pn]=(_fb[pn]||0)+val; _tot+=val; });
+  Object.keys(_fb).forEach(function(k){ _fb[k]=Math.round(_fb[k]*100)/100; });
   draft.fleetBreakdown=_fb; draft.fleet=Math.round(_tot*100)/100;
 }
 function updFleetTotal(){
   var ps=getParties(); var tL=0,tR=0;
-  // capture entered rates into draft so creditRate() sees them live
-  draft.fleetRateBreakdown=draft.fleetRateBreakdown||{};
-  ps.forEach(function(p,i){ var er=document.getElementById('e-fleetr-'+i); if(er){ var rv=parseFloat(er.value); if(!isNaN(rv)&&rv>0) draft.fleetRateBreakdown[p.name]=rv; } });
-  ps.forEach(function(p,i){ var el=document.getElementById('e-fleetp-'+i); if(el){ var v=parseFloat(el.value); if(!isNaN(v)){ tL+=v; tR+=v*creditRate(p.name,draft); } } });
+  draft.fleetRateBreakdown=draft.fleetRateBreakdown||{}; draft.fleetPetrolRateBreakdown=draft.fleetPetrolRateBreakdown||{};
+  ps.forEach(function(p,i){
+    var er=document.getElementById('e-fleetr-'+i); if(er){ var rv=parseFloat(er.value); if(!isNaN(rv)&&rv>0) draft.fleetRateBreakdown[p.name]=rv; }
+    var pr=document.getElementById('e-pfleetr-'+i); if(pr){ var prv=parseFloat(pr.value); if(!isNaN(prv)&&prv>0) draft.fleetPetrolRateBreakdown[p.name]=prv; }
+  });
+  ps.forEach(function(p,i){
+    var el=document.getElementById('e-fleetp-'+i); if(el){ var v=parseFloat(el.value); if(!isNaN(v)){ tL+=v; tR+=v*creditRate(p.name,draft); } }
+    var pe=document.getElementById('e-pfleetp-'+i); if(pe){ var pv=parseFloat(pe.value); if(!isNaN(pv)){ tL+=pv; tR+=pv*creditRatePetrol(p.name,draft); } }
+  });
   var lbl=document.getElementById('fleetTotalLbl'); if(lbl) lbl.textContent=(Math.round(tL*10)/10)+' L ≈ '+inr(tR);
 }
 
@@ -1079,10 +1122,33 @@ function periodReportHtml(title, sub, list){
       '<td style="'+td+'">'+Math.round(e.dSold||0)+'</td><td style="'+td+'">'+Math.round(e.pSold||0)+'</td>'+
       '<td style="'+td+'">'+inrR(e.totalRev)+'</td><td style="'+td+';color:'+((e.netProfit||0)>=0?ok:bad)+'">'+inrR(e.netProfit)+'</td></tr>'; }).join('');
   var dbd='<table role="presentation" cellspacing="0" style="border-collapse:collapse;width:100%;max-width:560px">'+head+rows+'</table>';
+  // Purchases (tanker deliveries received): value = litres × buy rate
+  var pT={ms:0,hsd:0,val:0};
+  var pList=list.slice().sort(function(a,b){ return a.date.localeCompare(b.date); }).filter(function(e){ return (e.pRcvd||0)>0||(e.dRcvd||0)>0; });
+  var pRows=pList.map(function(e){
+    var msv=(e.pRcvd||0)*(e.pBuy||0), hsv=(e.dRcvd||0)*(e.dBuy||0);
+    pT.ms+=(e.pRcvd||0); pT.hsd+=(e.dRcvd||0); pT.val+=msv+hsv;
+    var td='padding:4px 8px;border:1px solid #e3e8ee;font-size:12px;text-align:right';
+    return '<tr><td style="padding:4px 8px;border:1px solid #e3e8ee;font-size:12px">'+e.date.slice(8)+'-'+e.date.slice(5,7)+'</td>'+
+      '<td style="'+td+'">'+(e.dRcvd?Math.round(e.dRcvd)+' @₹'+e.dBuy:'—')+'</td>'+
+      '<td style="'+td+'">'+(e.pRcvd?Math.round(e.pRcvd)+' @₹'+e.pBuy:'—')+'</td>'+
+      '<td style="'+td+'">'+inrR(msv+hsv)+'</td></tr>';
+  }).join('');
+  var purchases='';
+  if(pRows){
+    var pHead='<tr><th style="'+th0+'">Date</th><th style="'+th+'">HSD recd (L)</th><th style="'+th+'">MS recd (L)</th><th style="'+th+'">Purchase ₹</th></tr>';
+    var pTot='<tr><td style="padding:5px 8px;border:1px solid #e3e8ee;font-size:12px;font-weight:700;background:#f2f6fa">Total</td>'+
+      '<td style="padding:5px 8px;border:1px solid #e3e8ee;font-size:12px;text-align:right;font-weight:700;background:#f2f6fa">'+Math.round(pT.hsd)+'</td>'+
+      '<td style="padding:5px 8px;border:1px solid #e3e8ee;font-size:12px;text-align:right;font-weight:700;background:#f2f6fa">'+Math.round(pT.ms)+'</td>'+
+      '<td style="padding:5px 8px;border:1px solid #e3e8ee;font-size:12px;text-align:right;font-weight:700;background:#f2f6fa">'+inrR(pT.val)+'</td></tr>';
+    purchases='<div style="font:700 14px Arial;color:#013a5e;margin:16px 0 6px">🛢️ Purchases (Tanker Deliveries)</div>'+
+      '<table role="presentation" cellspacing="0" style="border-collapse:collapse;width:100%;max-width:560px">'+pHead+pRows+pTot+'</table>';
+  }
   return '<div style="font-family:Arial,Helvetica,sans-serif;max-width:580px;color:#1a1a1a">'+
     '<div style="background:#013a5e;color:#fff;padding:14px 16px;border-radius:8px"><div style="font:800 17px Arial">'+title+'</div><div style="font-size:12px;color:#cfe0ee;margin-top:3px">'+sub+'</div></div>'+
     '<div style="font:700 14px Arial;color:#013a5e;margin:16px 0 6px">📊 Totals</div>'+totals+
     '<div style="font:700 14px Arial;color:#013a5e;margin:16px 0 6px">📅 Day by Day</div>'+dbd+
+    purchases+
     '<div style="font-size:11px;color:#999;margin-top:18px">Auto-generated by Dolly ERP.</div></div>';
 }
 function weekReportHtml(weekStart){
@@ -1163,6 +1229,24 @@ function renderMonthlyReport(){
       '<td class="r '+(e.netProfit>=0?'ok':'warn')+'" style="font-weight:600">'+inr(e.netProfit)+'</td></tr>';
   }).join('');
   if(!rows) rows='<tr><td colspan="9" style="text-align:center;color:var(--text3);padding:20px">No entries for this month</td></tr>';
+  // Purchases (tanker deliveries) — value = litres × buy rate
+  var tPurMS=0,tPurHSD=0,tPurVal=0;
+  var purList=month.slice().sort(function(a,b){ return a.date.localeCompare(b.date); }).filter(function(e){ return (e.pRcvd||0)>0||(e.dRcvd||0)>0; });
+  purList.forEach(function(e){ tPurMS+=(e.pRcvd||0); tPurHSD+=(e.dRcvd||0); tPurVal+=(e.pRcvd||0)*(e.pBuy||0)+(e.dRcvd||0)*(e.dBuy||0); });
+  var purRows=purList.map(function(e){
+    var msv=(e.pRcvd||0)*(e.pBuy||0), hsv=(e.dRcvd||0)*(e.dBuy||0);
+    return '<tr><td><strong>'+e.date.slice(8)+'</strong></td>'+
+      '<td class="r info">'+(e.dRcvd?fL(e.dRcvd)+' @₹'+e.dBuy:'—')+'</td>'+
+      '<td class="r info">'+(e.pRcvd?fL(e.pRcvd)+' @₹'+e.pBuy:'—')+'</td>'+
+      '<td class="r" style="font-weight:600">'+inr(msv+hsv)+'</td></tr>';
+  }).join('');
+  if(!purRows) purRows='<tr><td colspan="4" style="text-align:center;color:var(--text3);padding:16px">No tanker deliveries this month</td></tr>';
+  var purchasesCard='<div class="card"><div class="card-title">🛢️ Purchases — Tanker Deliveries</div>'+
+    '<div class="tbl-wrap"><table><thead><tr><th>Date</th><th>HSD recd</th><th>MS recd</th><th>Purchase ₹</th></tr></thead><tbody>'+purRows+
+    '<tr class="total-row"><td><strong>TOTAL</strong></td>'+
+    '<td class="r info"><strong>'+Math.round(tPurHSD).toLocaleString('en-IN')+' L</strong></td>'+
+    '<td class="r info"><strong>'+Math.round(tPurMS).toLocaleString('en-IN')+' L</strong></td>'+
+    '<td class="r"><strong>'+inr(tPurVal)+'</strong></td></tr></tbody></table></div></div>';
   var mn=new Date(rptMonth+'-01').toLocaleDateString('en-IN',{month:'long',year:'numeric'});
   document.getElementById('reportContent').innerHTML=
     '<div class="rtabs" style="margin-bottom:12px">'+
@@ -1196,7 +1280,8 @@ function renderMonthlyReport(){
     '<td class="r"><strong>'+inr(tCash)+'</strong></td><td class="r"><strong>'+inr(tUPI)+'</strong></td>'+
     '<td class="r warn"><strong>'+inr(tExp)+'</strong></td>'+
     '<td class="r '+(tProfit>=0?'ok':'warn')+'"><strong>'+inr(tProfit)+'</strong></td></tr>'+
-    '</tbody></table></div></div>';
+    '</tbody></table></div></div>'+
+    purchasesCard;
 }
 
 // ── ALL-TIME ──────────────────────────────────────────────────────
