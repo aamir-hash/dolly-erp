@@ -1192,7 +1192,8 @@ async function runReconCheck(){
     for(var i=0;i<lv.length;i++){ for(var j=0;j<lv[i].length;j++){ var c=lv[i][j];
       if(typeof c==='string'){ var t=c.trim(); if(/^MAT Balance In Dolly/i.test(t)) mat=+lv[i][j+1]; if(/^Auro\s+Balance In Dolly/i.test(t)) auro=+lv[i][j+1]; } } }
   }catch(e){}
-  var targets={'AAMIR TRANSPORT':(mat!=null?-mat:null),'ARVINDO':(auro!=null?-auro:null),'TAJ TRADERS':-1000000,'KRISHABH CON.':0,'BALAJI TRANSPO':0,'SS TRANSPORT':0,'VIKAS COAL':0,'VAIBHAV YERAWAR':0};
+  // TAJ TRADERS' ₹10,00,000 credit was transferred to Mohd Aamir Transport (2-Jul-2026): TAJ target is now 0 and AAMIR carries the ₹10L credit (mat − 10,00,000). App-side only — NOT reflected in the master Excel ledger, so do not also net it in the ledger.
+  var targets={'AAMIR TRANSPORT':(mat!=null?-mat-1000000:null),'ARVINDO':(auro!=null?-auro:null),'TAJ TRADERS':0,'KRISHABH CON.':0,'BALAJI TRANSPO':0,'SS TRANSPORT':0,'VIKAS COAL':0,'VAIBHAV YERAWAR':0};
   if(mat==null||auro==null){ checks.push({name:'Balances vs master ledger',status:'FAIL',detail:'Could not read the MAT/Auro balance cells from the master ledger.'}); }
   else {
     var mism=[];
