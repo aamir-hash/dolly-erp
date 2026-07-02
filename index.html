@@ -1142,7 +1142,9 @@ function reanchorPanelHtml(){
     return '<div class="card"><div class="card-title">📒 Takeover reconciliation (from '+escHtml(store.takeover.date)+')</div>'+
       '<div class="vrow"><span class="vl">🚛 Aamir (MAT) balance</span><span class="vv">'+inr(getPartyBalance(nm))+' <span style="font-size:11px;color:var(--text3)">'+(getPartyBalance(nm)<0?'Dolly owes Aamir':'owes Dolly')+'</span></span></div>'+
       hrow(heads.matInfusion)+hrow(heads.cornea)+hrow(heads.custAdvance)+hrow(heads.ccInterest)+hrow(heads.bpclOpening)+
-      '<div style="font-size:11px;color:var(--text3);margin-top:6px">MAT infusion posted for Apr–May. Apply June statements + post June MAT to bring Aamir current.</div></div>';
+      '<div style="font-size:11px;color:var(--text3);margin-top:6px">MAT infusion posted for Apr–May.</div>'+
+      '<button class="btn btn-outline" style="margin-top:10px;color:#c62828;border-color:#c62828" onclick="previewResetTakeover()">🗑 Reset / start afresh…</button>'+
+      '<div id="reanchorPanel" style="margin-top:10px"></div></div>';
   }
   return '<div class="card" style="border:1px dashed var(--blue)"><div class="card-title">📒 Set up takeover reconciliation (8-Apr-2026)</div>'+
     '<p style="font-size:12px;color:var(--text2);margin:4px 0 8px">One-time: anchor Aamir to the 8-Apr takeover (opening 0), post the Apr–May MAT infusion from the statements, and create the opening heads (Cornea loan, customer advance, Kanyaka Nagri CC interest, BPCL opening).</p>'+
@@ -1201,6 +1203,34 @@ function commitTakeover(){
   saveReconStore(store);
   showToast('✓ Takeover reconciliation set — Aamir '+inr(getPartyBalance(nm)));
   pendingTakeover=null;
+  renderReconcile();
+}
+// Wipe the statements-side reconciliation to start afresh (removes MAT infusion posting + heads + recon store; keeps 8-Apr epoch)
+function previewResetTakeover(){
+  var panel=document.getElementById('reanchorPanel'); if(!panel) return;
+  if(!hasPerm('reconcile')){ showToast('No permission'); return; }
+  var nm='AAMIR TRANSPORT';
+  var matRows=getPayments().filter(function(x){ return x.party===nm && /MAT infusion|MAT bank deposits/i.test(x.note||''); });
+  var removedTotal=matRows.reduce(function(s,x){ return s+(x.amount||0); },0);
+  var store=getReconStore();
+  var vr=function(l,v){ return '<div class="vrow"><span class="vl">'+l+'</span><span class="vv">'+v+'</span></div>'; };
+  panel.innerHTML='<div class="card" style="border:1px solid #c62828"><div class="card-title" style="color:#c62828">Reset the statements-side reconciliation?</div>'+
+    vr('Remove MAT infusion posting', matRows.length+' row(s), '+inr(removedTotal))+
+    vr('Remove reconciliation heads', Object.keys(store.heads||{}).length+' (incl. customer advance)')+
+    vr('Clear saved statement records', Object.keys(store.reconciliations||{}).length+' month(s) + BPCL balance')+
+    vr('Aamir 8-Apr epoch', 'KEPT (opening reset to 0)')+
+    '<div style="font-size:11px;color:var(--text3);margin:6px 0">After reset, Aamir shows raw purchases − payments (unreconciled) until you re-post MAT. Fuel sales/entries are untouched.</div>'+
+    '<div style="display:flex;gap:8px"><button class="btn btn-blue" style="width:auto;padding:10px 18px;background:#c62828" onclick="commitResetTakeover()">Yes, reset</button><button class="btn btn-outline" style="width:auto;padding:10px 18px" onclick="document.getElementById(\'reanchorPanel\').innerHTML=\'\'">Cancel</button></div></div>';
+}
+function commitResetTakeover(){
+  if(!hasPerm('reconcile')){ showToast('No permission'); return; }
+  var nm='AAMIR TRANSPORT';
+  var pays=getPayments().filter(function(x){ return !(x.party===nm && /MAT infusion|MAT bank deposits/i.test(x.note||'')); });
+  savePayments(pays);
+  var parties=getParties(); var p=parties.find(function(x){ return x.name===nm; });
+  if(p){ p.openingBalance=0; p.updatedAt=new Date().toISOString(); saveParties(parties); }
+  saveReconStore({reconciliations:{}, bpclBalance:null, heads:{}, takeover:null});
+  showToast('✓ Reset — statements side cleared. Aamir '+inr(getPartyBalance(nm)));
   renderReconcile();
 }
 function reconSavedHtml(){
@@ -1277,7 +1307,7 @@ function renderBpclResult(d){
   box.innerHTML=summary+table+applyBtn+'<div id="applyPanel" style="margin-top:12px"></div><p style="font-size:12px;color:var(--text3);margin-top:10px">Read-only until you press Apply. Applying stores a dated reconciliation record + the BPCL closing balance and cross-checks invoices against ERP purchases — it does <b>not</b> change any party ledger.</p>';
 }
 
-/* BUILD:bankparser-v5-takeover */
+/* BUILD:bankparser-v6-reset */
 // Parse a Union Bank of India "Statement of Account" PDF (deposit/withdrawal by balance movement)
 function parseBankLines(lines){
   var out={period:'', opening:null, closing:null, rows:[],
