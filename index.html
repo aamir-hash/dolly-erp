@@ -1137,10 +1137,15 @@ async function doReconParse(){
     if(name.endsWith('.pdf')){
       var buf=await f.arrayBuffer();
       var lines=await pdfToLines(buf);
-      var d=parseBpclLines(lines);
-      reconData=d; renderBpclResult(d);
+      var joined=lines.slice(0,25).join(' ');
+      if(/UNION BANK OF INDIA|STATEMENT OF ACCOUNT FOR THE PERIOD/i.test(joined)){
+        var bd=parseBankLines(lines); reconData=bd; renderBankResult(bd);
+      } else {
+        var d=parseBpclLines(lines); reconData=d; renderBpclResult(d);
+      }
     } else if(name.endsWith('.xlsx')||name.endsWith('.xls')){
-      box.innerHTML='<p style="color:var(--text3)">Bank-statement (Excel) parsing is being built for the UBI format — upload the BPCL PDF for now.</p>';
+      await ensureXlsx();
+      box.innerHTML='<p style="color:var(--text3)">Excel bank statement detected — the PDF parser is live; Excel parsing can be added when you switch formats.</p>';
     } else { box.innerHTML='<p style="color:#c62828">Unsupported file type.</p>'; }
   }catch(e){ box.innerHTML='<p style="color:#c62828">Could not parse: '+escHtml(e.message)+'</p>'; }
 }
@@ -1169,6 +1174,72 @@ function renderBpclResult(d){
   var rows=d.rows.map(function(r){ return '<tr><td style="'+td0+'">'+r.date+'</td><td style="'+td0+'">'+escHtml(r.narr)+'</td><td style="'+td+'">'+inr(r.amount)+'</td><td style="'+td0+';text-align:center">'+r.docType+'</td></tr>'; }).join('');
   var table='<div class="card"><div class="card-title">All '+d.rows.length+' lines</div><div class="tbl-wrap"><table style="width:100%;border-collapse:collapse"><thead><tr><th style="'+td0+'">Date</th><th style="'+td0+'">Narration</th><th style="'+td+'">Amount</th><th style="'+td0+'">Type</th></tr></thead><tbody>'+rows+'</tbody></table></div></div>';
   box.innerHTML=summary+table+'<p style="font-size:12px;color:var(--text3);margin-top:10px">Nothing has been saved — this is a read-only check. Once you confirm the numbers match, I\'ll wire up the "apply" step (record MAT financing, purchases, BPCL balance).</p>';
+}
+
+/* BUILD:bankparser-v1 */
+// Parse a Union Bank of India "Statement of Account" PDF (deposit/withdrawal by balance movement)
+function parseBankLines(lines){
+  var out={period:'', opening:null, closing:null, rows:[],
+    cat:{phonepe:0,card:0,matIn:0,bpclOut:0,charges:0,otherIn:0,otherOut:0},
+    counts:{phonepe:0,card:0,matIn:0,bpclOut:0,charges:0,otherIn:0,otherOut:0},
+    totalDep:0, totalWd:0};
+  var prevBal=null;
+  lines.forEach(function(L){
+    var pm=L.match(/PERIOD FROM\s+(.+?\d{4})\s+to\s+(.+?\d{4})/i);
+    if(pm) out.period=pm[1].replace(/\s+/g,'')+' → '+pm[2].replace(/\s+/g,'');
+    var m=L.match(/^(\d\d) - (\d\d) - (\d{4})\s+(.+?)\s+([\d,]+\.\d{2})\s+([\d,]+\.\d{2})(Cr|Dr)\b/);
+    if(!m){
+      if(prevBal===null){ var ob=L.match(/^([\d,]+\.\d{2})\s+([\d,]+\.\d{2})(Cr|Dr)\s*$/); if(ob){ prevBal=parseFloat(ob[2].replace(/,/g,''))*(ob[3]==='Dr'?-1:1); out.opening=prevBal; } }
+      return;
+    }
+    var date=m[3]+'-'+m[2]+'-'+m[1];
+    var part=m[4].trim();
+    var amt=parseFloat(m[5].replace(/,/g,''));
+    var bal=parseFloat(m[6].replace(/,/g,''))*(m[7]==='Dr'?-1:1);
+    var dep=(prevBal!=null)?(bal>prevBal):true;
+    if(prevBal!=null){ var delta=Math.round((bal-prevBal)*100)/100; if(Math.abs(Math.abs(delta)-amt)<1) amt=Math.abs(delta); }
+    prevBal=bal; out.closing=bal;
+    var kind;
+    if(/PHONEPE/i.test(part)) kind='phonepe';
+    else if(/PINE LABS|CREDIT CARD/i.test(part)) kind='card';
+    else if(/AMIR|AAMIR|MOHAMMAD/i.test(part)) kind='matIn';
+    else if(/BHARAT PETROLEUM/i.test(part)) kind='bpclOut';
+    else if(/charge/i.test(part)) kind='charges';
+    else kind = dep?'otherIn':'otherOut';
+    out.cat[kind]+=amt; out.counts[kind]++;
+    if(dep) out.totalDep+=amt; else out.totalWd+=amt;
+    out.rows.push({date:date, part:part, amt:amt, dep:dep, kind:kind});
+  });
+  return out;
+}
+function renderBankResult(d){
+  var box=document.getElementById('reconResult'); if(!box) return;
+  // ERP cross-check: digital collections (UPI + swipe) for the statement's start month
+  var ym=null; var pm=(d.period||'').match(/(\d{2})-(\d{2})-(\d{4})/); if(pm) ym=pm[3]+'-'+pm[2];
+  var erpDigital=0; if(ym){ entries.filter(function(e){ return e.submitted&&e.date.slice(0,7)===ym; }).forEach(function(e){ erpDigital+=(e.upi||0)+(e.swipe||0); }); erpDigital=Math.round(erpDigital); }
+  var digital=d.cat.phonepe+d.cat.card;
+  var digNote = (ym&&erpDigital)? (Math.abs(digital-erpDigital)<Math.max(2000,erpDigital*0.02)?'✓ ≈ ERP UPI+Swipe '+inr(erpDigital):'⚠ ERP UPI+Swipe '+inr(erpDigital)) : '';
+  function crow(label,amt,cnt,note){ return '<div class="vrow"><span class="vl">'+label+(cnt!=null?' <span style="color:var(--text3);font-size:11px">('+cnt+')</span>':'')+'</span><span class="vv">'+inr(amt)+(note?' <span style="font-size:11px;color:var(--text3)">'+note+'</span>':'')+'</span></div>'; }
+  var summary='<div class="card"><div class="card-title">🏦 Union Bank — '+escHtml(d.period||'statement')+'</div>'+
+    crow('Opening balance', d.opening||0)+
+    '<div style="font:700 12px var(--font);color:var(--green);margin:8px 0 2px">Money IN</div>'+
+    crow('📱 PhonePe (UPI)', d.cat.phonepe, d.counts.phonepe)+
+    crow('💳 Pine Labs / card', d.cat.card, d.counts.card, digNote)+
+    crow('🚛 MAT deposits (Aamir)', d.cat.matIn, d.counts.matIn)+
+    (d.cat.otherIn?crow('Other credits', d.cat.otherIn, d.counts.otherIn):'')+
+    '<div style="font:700 12px var(--font);color:var(--red);margin:8px 0 2px">Money OUT</div>'+
+    crow('⛽ Paid to BPCL', d.cat.bpclOut, d.counts.bpclOut)+
+    crow('Bank charges', d.cat.charges, d.counts.charges)+
+    (d.cat.otherOut?crow('Other debits', d.cat.otherOut, d.counts.otherOut):'')+
+    '<div class="vrow" style="border-top:1px solid var(--border);margin-top:6px;padding-top:6px"><span class="vl" style="font-weight:700">Total in / out</span><span class="vv">'+inr(d.totalDep)+' / '+inr(d.totalWd)+'</span></div>'+
+    crow('Closing balance', d.closing||0)+
+    '<div style="font-size:11px;color:var(--text3);margin-top:8px">Check: opening + in − out = '+inr((d.opening||0)+d.totalDep-d.totalWd)+' (should equal closing)</div></div>';
+  var td='padding:4px 8px;border:1px solid var(--border);font-size:11px;text-align:right';
+  var td0='padding:4px 8px;border:1px solid var(--border);font-size:11px';
+  var kindLbl={phonepe:'PhonePe',card:'Card',matIn:'MAT in',bpclOut:'BPCL',charges:'Charge',otherIn:'Credit',otherOut:'Debit'};
+  var rows=d.rows.map(function(r){ return '<tr><td style="'+td0+'">'+r.date+'</td><td style="'+td0+'">'+escHtml(r.part.slice(0,44))+'</td><td style="'+td+';color:'+(r.dep?'#1e7d34':'#c0392b')+'">'+(r.dep?'+':'−')+inr(r.amt).replace('₹','₹')+'</td><td style="'+td0+';text-align:center">'+(kindLbl[r.kind]||r.kind)+'</td></tr>'; }).join('');
+  var table='<div class="card"><div class="card-title">All '+d.rows.length+' transactions</div><div class="tbl-wrap"><table style="width:100%;border-collapse:collapse;min-width:560px"><thead><tr><th style="'+td0+'">Date</th><th style="'+td0+'">Particulars</th><th style="'+td+'">Amount</th><th style="'+td0+'">Type</th></tr></thead><tbody>'+rows+'</tbody></table></div></div>';
+  box.innerHTML=summary+table+'<p style="font-size:12px;color:var(--text3);margin-top:10px">Read-only check — nothing saved. Deposit/withdrawal is derived from the running balance. Once you confirm, I\'ll wire the "apply" step (match PhonePe/card to daily collections, MAT deposits to Aamir\'s ledger, BPCL payments to the BPCL statement).</p>';
 }
 
 // ── RECONCILIATION CHECKER ────────────────────────────────────────
