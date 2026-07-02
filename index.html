@@ -1126,7 +1126,64 @@ function renderReconcile(){
     '<p style="color:var(--text3);font-size:13px;margin:6px 0 12px">Upload a <b>BPCL statement (PDF)</b> or a <b>bank statement (PDF)</b>. The ERP reads it, sorts every line, and shows the totals so you can check it against your books. Press <b>Apply</b> to file it as a dated reconciliation record.</p>'+
     '<input type="file" id="reconFile" accept=".pdf,.xlsx,.xls" style="font-size:13px;margin-bottom:10px"/>'+
     '<button class="btn btn-blue" onclick="doReconParse()">Parse file</button>'+
-    '<div id="reconResult" style="margin-top:14px"></div></div>';
+    '<div id="reconResult" style="margin-top:14px"></div></div>'+
+    reanchorPanelHtml();
+}
+function reanchorPanelHtml(){
+  if(!hasPerm('reconcile')) return '';
+  var p=getParties().find(function(x){ return x.name==='AAMIR TRANSPORT'; });
+  if(!p) return '';
+  if(p.ledgerStart) return '<div class="card"><div class="card-title">🚛 Aamir ledger (ERP-authoritative)</div><div style="font-size:12px;color:var(--text3)">Re-anchored '+escHtml(p.ledgerStart)+'. Opening (end-May close) '+inr(p.openingBalance||0)+' · current balance '+inr(getPartyBalance('AAMIR TRANSPORT'))+'.</div></div>';
+  return '<div class="card" style="border:1px dashed var(--blue)"><div class="card-title">🚛 One-time: re-anchor Aamir to ERP</div>'+
+    '<p style="font-size:12px;color:var(--text2);margin:4px 0 8px">Move Aamir/MAT off the master Excel: set his opening balance to the end-May closing and track June forward (incl. June MAT bank deposits). <b>Apply the June bank statement first</b> so the MAT figure comes straight from it.</p>'+
+    '<button class="btn btn-blue" onclick="previewReanchor()">Re-anchor Aamir…</button><div id="reanchorPanel" style="margin-top:10px"></div></div>';
+}
+var pendingReanchor=null;
+function previewReanchor(){
+  var panel=document.getElementById('reanchorPanel'); if(!panel) return;
+  if(!hasPerm('reconcile')){ showToast('No permission'); return; }
+  var nm='AAMIR TRANSPORT';
+  var p=getParties().find(function(x){ return x.name===nm; });
+  if(!p){ panel.innerHTML='<p style="color:#c62828">Aamir party not found.</p>'; return; }
+  if(p.ledgerStart){ panel.innerHTML='<p style="color:var(--text3)">Already re-anchored ('+escHtml(p.ledgerStart)+').</p>'; return; }
+  var START='2026-06-01', MAYEND='2026-05-31';
+  var sales=getPartySales(nm), pays=getPartyPayments(nm);
+  var sum=function(a){ return a.reduce(function(s,x){ return s+(x.amount||0); },0); };
+  var ob=(p.openingBalance)||0;
+  var baseline=Math.round(ob + sum(sales.filter(function(x){ return x.date<=MAYEND; })) - sum(pays.filter(function(x){ return x.date<=MAYEND; })));
+  var juneSales=Math.round(sum(sales.filter(function(x){ return x.date>=START; })));
+  var junePays=Math.round(sum(pays.filter(function(x){ return x.date>=START; })));
+  var rec=getReconStore().reconciliations['2026-06'];
+  var mat=(rec&&rec.bank&&rec.bank.cat&&rec.bank.cat.matIn!=null)?Math.round(rec.bank.cat.matIn):null;
+  if(mat==null){ panel.innerHTML='<div style="color:#b26a00;font-size:13px;padding:8px 0">Apply the June <b>bank</b> statement first — its MAT deposits total is used as the amount to post.</div>'; return; }
+  var projected=baseline+juneSales-junePays-mat;
+  pendingReanchor={baseline:baseline, mat:mat, start:START, projected:projected};
+  var vr=function(l,v){ return '<div class="vrow"><span class="vl">'+l+'</span><span class="vv">'+v+'</span></div>'; };
+  panel.innerHTML='<div class="card" style="border:1px solid var(--blue)"><div class="card-title">Review re-anchor — Aamir</div>'+
+    vr('Opening = end-May closing', inr(baseline))+
+    vr('Ledger start (count from)', START)+
+    vr('June-onward fuel purchases', '+ '+inr(juneSales))+
+    vr('June-onward payments/transfer', '− '+inr(junePays))+
+    vr('Post June MAT deposits', '− '+inr(mat))+
+    '<div class="vrow" style="border-top:1px solid var(--border);margin-top:6px;padding-top:6px"><span class="vl" style="font-weight:700">New Aamir balance</span><span class="vv">'+inr(projected)+' <span style="font-size:11px;color:var(--text3)">'+(projected<0?'Dolly owes Aamir':'owes Dolly')+'</span></span></div>'+
+    '<div style="margin-top:12px;display:flex;gap:8px"><button class="btn btn-blue" style="width:auto;padding:10px 18px" onclick="commitReanchor()">Confirm &amp; Save</button><button class="btn btn-outline" style="width:auto;padding:10px 18px" onclick="document.getElementById(\'reanchorPanel\').innerHTML=\'\'">Cancel</button></div>'+
+    '<p style="font-size:11px;color:var(--text3);margin-top:8px">Writes Aamir\'s opening balance + ledger start and posts one MAT financing payment. Syncs to all devices; this button disappears once done.</p></div>';
+}
+function commitReanchor(){
+  if(!pendingReanchor){ return; }
+  if(!hasPerm('reconcile')){ showToast('No permission'); return; }
+  var nm='AAMIR TRANSPORT';
+  var parties=getParties(); var p=parties.find(function(x){ return x.name===nm; });
+  if(!p){ showToast('Aamir not found'); return; }
+  if(p.ledgerStart){ showToast('Already re-anchored'); pendingReanchor=null; return; }
+  p.openingBalance=pendingReanchor.baseline; p.ledgerStart=pendingReanchor.start; p.updatedAt=new Date().toISOString();
+  saveParties(parties);
+  var note='MAT bank deposits Jun-2026 (financing)';
+  var pays=getPayments();
+  if(!pays.some(function(x){ return x.party===nm && x.note===note; })){ pays.push({party:nm, date:'2026-06-30', amount:pendingReanchor.mat, note:note}); savePayments(pays); }
+  showToast('✓ Aamir re-anchored — new balance '+inr(getPartyBalance(nm)));
+  pendingReanchor=null;
+  renderReconcile();
 }
 function reconSavedHtml(){
   var s=getReconStore();
@@ -1202,7 +1259,7 @@ function renderBpclResult(d){
   box.innerHTML=summary+table+applyBtn+'<div id="applyPanel" style="margin-top:12px"></div><p style="font-size:12px;color:var(--text3);margin-top:10px">Read-only until you press Apply. Applying stores a dated reconciliation record + the BPCL closing balance and cross-checks invoices against ERP purchases — it does <b>not</b> change any party ledger.</p>';
 }
 
-/* BUILD:bankparser-v3-apply */
+/* BUILD:bankparser-v4-reanchor */
 // Parse a Union Bank of India "Statement of Account" PDF (deposit/withdrawal by balance movement)
 function parseBankLines(lines){
   var out={period:'', opening:null, closing:null, rows:[],
@@ -1355,13 +1412,15 @@ async function runReconCheck(){
     for(var i=0;i<lv.length;i++){ for(var j=0;j<lv[i].length;j++){ var c=lv[i][j];
       if(typeof c==='string'){ var t=c.trim(); if(/^MAT Balance In Dolly/i.test(t)) mat=+lv[i][j+1]; if(/^Auro\s+Balance In Dolly/i.test(t)) auro=+lv[i][j+1]; } } }
   }catch(e){}
-  // TAJ TRADERS' ₹10,00,000 credit was transferred to Mohd Aamir Transport (2-Jul-2026): TAJ target is now 0 and AAMIR carries the ₹10L credit (mat − 10,00,000). App-side only — NOT reflected in the master Excel ledger, so do not also net it in the ledger.
-  var targets={'AAMIR TRANSPORT':(mat!=null?-mat-1000000:null),'ARVINDO':(auro!=null?-auro:null),'TAJ TRADERS':0,'KRISHABH CON.':0,'BALAJI TRANSPO':0,'SS TRANSPORT':0,'VIKAS COAL':0,'VAIBHAV YERAWAR':0};
-  if(mat==null||auro==null){ checks.push({name:'Balances vs master ledger',status:'FAIL',detail:'Could not read the MAT/Auro balance cells from the master ledger.'}); }
+  // 2-Jul-2026: AAMIR/MAT is now ERP-AUTHORITATIVE — no longer pinned to the master Excel (Aamir's balance
+  // floats on his re-anchored opening balance + June-onward entries + posted MAT deposits). We still pin
+  // ARVINDO to the Auro cell and keep every other party at 0. TAJ TRADERS = 0 (its ₹10L moved to AAMIR).
+  var targets={'AAMIR TRANSPORT':null,'ARVINDO':(auro!=null?-auro:null),'TAJ TRADERS':0,'KRISHABH CON.':0,'BALAJI TRANSPO':0,'SS TRANSPORT':0,'VIKAS COAL':0,'VAIBHAV YERAWAR':0};
+  if(auro==null){ checks.push({name:'Balances vs master ledger',status:'FAIL',detail:'Could not read the Auro balance cell from the master ledger.'}); }
   else {
     var mism=[];
     getParties().forEach(function(p){ var tg=targets[p.name]; if(tg==null) return; var b=getPartyBalance(p.name); if(Math.abs(b-tg)>1) mism.push(p.name+': app '+inr(b)+' vs ledger '+inr(tg)); });
-    checks.push({name:'Balances vs master ledger',status:(mism.length?'FAIL':'PASS'),detail:(mism.length?mism.join('; '):'All parties match (MAT cell → AAMIR '+inr(targets['AAMIR TRANSPORT'])+', Auro → ARVINDO '+inr(targets['ARVINDO'])+').')});
+    checks.push({name:'Balances vs master ledger',status:(mism.length?'FAIL':'PASS'),detail:(mism.length?mism.join('; '):'ERP-authoritative for AAMIR (app '+inr(getPartyBalance('AAMIR TRANSPORT'))+', not Excel-pinned); ARVINDO pinned to Auro '+inr(targets['ARVINDO'])+'; other parties 0.')});
   }
 
   // Check B — no spiral / no reconciliation rows
@@ -1995,8 +2054,10 @@ function getPartyPayments(partyName){
 function getPartyBalance(partyName){
   var party=getParties().find(function(p){ return p.name===partyName; });
   var ob=(party&&party.openingBalance)||0;
+  var start=(party&&party.ledgerStart)||null; // ERP-authoritative epoch: count activity from this date only
   var sales=getPartySales(partyName);
   var payments=getPartyPayments(partyName);
+  if(start){ sales=sales.filter(function(x){ return x.date>=start; }); payments=payments.filter(function(x){ return x.date>=start; }); }
   var totalSales=sales.reduce(function(s,x){ return s+x.amount; },0);
   var totalPaid=payments.reduce(function(s,x){ return s+x.amount; },0);
   return ob+totalSales-totalPaid;
