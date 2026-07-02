@@ -1143,7 +1143,9 @@ function reanchorPanelHtml(){
       '<div class="vrow"><span class="vl">🚛 Aamir (MAT) balance</span><span class="vv">'+inr(getPartyBalance(nm))+' <span style="font-size:11px;color:var(--text3)">'+(getPartyBalance(nm)<0?'Dolly owes Aamir':'owes Dolly')+'</span></span></div>'+
       hrow(heads.matInfusion)+hrow(heads.cornea)+hrow(heads.custAdvance)+hrow(heads.ccInterest)+hrow(heads.bpclOpening)+
       '<div style="font-size:11px;color:var(--text3);margin-top:6px">MAT infusion posted for Apr–May.</div>'+
-      '<button class="btn btn-outline" style="margin-top:10px;color:#c62828;border-color:#c62828" onclick="previewResetTakeover()">🗑 Reset / start afresh…</button>'+
+      '<div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap">'+
+      '<button class="btn btn-blue" style="width:auto;padding:10px 16px" onclick="previewFinalise()">✅ Finalise reconciliation (set party balances)…</button>'+
+      '<button class="btn btn-outline" style="width:auto;padding:10px 16px;color:#c62828;border-color:#c62828" onclick="previewResetTakeover()">🗑 Reset / start afresh…</button></div>'+
       '<div id="reanchorPanel" style="margin-top:10px"></div></div>';
   }
   return '<div class="card" style="border:1px dashed var(--blue)"><div class="card-title">📒 Set up takeover reconciliation (8-Apr-2026)</div>'+
@@ -1233,6 +1235,43 @@ function commitResetTakeover(){
   showToast('✓ Reset — statements side cleared. Aamir '+inr(getPartyBalance(nm)));
   renderReconcile();
 }
+
+// ── FINALISE: pin each party to its reconciled 30-Jun balance, keep 8-Apr epoch so July+ entries move it ──
+// Provisional on cash-to-office (₹47,49,758). Update AAMIR target after the morning cash reconciliation.
+var RECON_TARGETS={'AAMIR TRANSPORT':1353047,'ARVINDO':-4349245,'VIKAS COAL':-362730,'TAJ TRADERS':0,'SS TRANSPORT':205640,'BALAJI TRANSPO':10878};
+function previewFinalise(){
+  var panel=document.getElementById('reanchorPanel'); if(!panel) return;
+  if(!hasPerm('reconcile')){ showToast('No permission'); return; }
+  var vr=function(l,cur,tgt){ return '<div class="vrow"><span class="vl">'+escHtml(l)+'</span><span class="vv">'+inr(cur)+' → <b>'+inr(tgt)+'</b> <span style="font-size:11px;color:var(--text3)">'+(tgt>0?'owes Dolly':tgt<0?'in credit':'nil')+'</span></span></div>'; };
+  var body='';
+  Object.keys(RECON_TARGETS).forEach(function(nm){ body+=vr(nm, Math.round(getPartyBalance(nm)), RECON_TARGETS[nm]); });
+  panel.innerHTML='<div class="card" style="border:1px solid var(--blue)"><div class="card-title">Finalise — set reconciled balances (as of 30-Jun-2026)</div>'+
+    body+
+    '<div style="font-size:11px;color:var(--text3);margin-top:8px">Pins each party to its reconciled balance (via opening balance) and keeps the 8-Apr ledger start, so July-onward entries move it from here. Aamir includes the provisional cash-to-office ₹47,49,758 — re-run after the morning cash reconciliation if it changes.</div>'+
+    '<div style="margin-top:12px;display:flex;gap:8px"><button class="btn btn-blue" style="width:auto;padding:10px 18px" onclick="commitFinalise()">Confirm &amp; write to ERP</button><button class="btn btn-outline" style="width:auto;padding:10px 18px" onclick="document.getElementById(\'reanchorPanel\').innerHTML=\'\'">Cancel</button></div></div>';
+}
+function commitFinalise(){
+  if(!hasPerm('reconcile')){ showToast('No permission'); return; }
+  var parties=getParties();
+  Object.keys(RECON_TARGETS).forEach(function(nm){
+    var p=parties.find(function(x){ return x.name===nm; }); if(!p) return;
+    p.ledgerStart='2026-04-08';
+    p.openingBalance=0; // temp to read computed activity
+  });
+  saveParties(parties); // so getPartyBalance uses opening 0
+  parties=getParties();
+  Object.keys(RECON_TARGETS).forEach(function(nm){
+    var p=parties.find(function(x){ return x.name===nm; }); if(!p) return;
+    var computed=getPartyBalance(nm); // = salesFrom8Apr − paysFrom8Apr (opening 0)
+    p.openingBalance=Math.round((RECON_TARGETS[nm]-computed)*100)/100;
+    p.updatedAt=new Date().toISOString();
+  });
+  saveParties(parties);
+  var s=getReconStore(); s.finalised={at:new Date().toISOString(), by:(typeof currentDisplayName!=='undefined'&&currentDisplayName)||'unknown', targets:RECON_TARGETS, cashProvisional:true}; saveReconStore(s);
+  showToast('✓ Reconciliation finalised — Aamir '+inr(getPartyBalance('AAMIR TRANSPORT')));
+  renderReconcile();
+  if(typeof renderParties==='function') try{ renderParties(); }catch(e){}
+}
 function reconSavedHtml(){
   var s=getReconStore();
   var months=Object.keys(s.reconciliations||{}).sort().reverse();
@@ -1307,7 +1346,7 @@ function renderBpclResult(d){
   box.innerHTML=summary+table+applyBtn+'<div id="applyPanel" style="margin-top:12px"></div><p style="font-size:12px;color:var(--text3);margin-top:10px">Read-only until you press Apply. Applying stores a dated reconciliation record + the BPCL closing balance and cross-checks invoices against ERP purchases — it does <b>not</b> change any party ledger.</p>';
 }
 
-/* BUILD:bankparser-v6-reset */
+/* BUILD:bankparser-v7-finalise */
 // Parse a Union Bank of India "Statement of Account" PDF (deposit/withdrawal by balance movement)
 function parseBankLines(lines){
   var out={period:'', opening:null, closing:null, rows:[],
