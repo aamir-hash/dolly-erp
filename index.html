@@ -1176,7 +1176,7 @@ function renderBpclResult(d){
   box.innerHTML=summary+table+'<p style="font-size:12px;color:var(--text3);margin-top:10px">Nothing has been saved — this is a read-only check. Once you confirm the numbers match, I\'ll wire up the "apply" step (record MAT financing, purchases, BPCL balance).</p>';
 }
 
-/* BUILD:bankparser-v1 */
+/* BUILD:bankparser-v2 */
 // Parse a Union Bank of India "Statement of Account" PDF (deposit/withdrawal by balance movement)
 function parseBankLines(lines){
   var out={period:'', opening:null, closing:null, rows:[],
@@ -1220,17 +1220,18 @@ function renderBankResult(d){
   var digital=d.cat.phonepe+d.cat.card;
   var digNote = (ym&&erpDigital)? (Math.abs(digital-erpDigital)<Math.max(2000,erpDigital*0.02)?'✓ ≈ ERP UPI+Swipe '+inr(erpDigital):'⚠ ERP UPI+Swipe '+inr(erpDigital)) : '';
   function crow(label,amt,cnt,note){ return '<div class="vrow"><span class="vl">'+label+(cnt!=null?' <span style="color:var(--text3);font-size:11px">('+cnt+')</span>':'')+'</span><span class="vv">'+inr(amt)+(note?' <span style="font-size:11px;color:var(--text3)">'+note+'</span>':'')+'</span></div>'; }
+  function otherLn(kind){ return d.rows.filter(function(r){return r.kind===kind;}).map(function(r){ return '<div class="vrow" style="padding-left:14px"><span class="vl" style="font-size:12px"><span style="color:var(--text3);font-size:10px">'+r.date+'</span> '+escHtml(r.part.slice(0,42))+'</span><span class="vv" style="font-size:12px">'+inr(r.amt)+'</span></div>'; }).join(''); }
   var summary='<div class="card"><div class="card-title">🏦 Union Bank — '+escHtml(d.period||'statement')+'</div>'+
     crow('Opening balance', d.opening||0)+
     '<div style="font:700 12px var(--font);color:var(--green);margin:8px 0 2px">Money IN</div>'+
     crow('📱 PhonePe (UPI)', d.cat.phonepe, d.counts.phonepe)+
     crow('💳 Pine Labs / card', d.cat.card, d.counts.card, digNote)+
     crow('🚛 MAT deposits (Aamir)', d.cat.matIn, d.counts.matIn)+
-    (d.cat.otherIn?crow('Other credits', d.cat.otherIn, d.counts.otherIn):'')+
+    (d.cat.otherIn?('<div style="font-size:11px;color:var(--text3);margin:4px 0 1px">Other credits ('+d.counts.otherIn+')</div>'+otherLn('otherIn')):'')+
     '<div style="font:700 12px var(--font);color:var(--red);margin:8px 0 2px">Money OUT</div>'+
     crow('⛽ Paid to BPCL', d.cat.bpclOut, d.counts.bpclOut)+
     crow('Bank charges', d.cat.charges, d.counts.charges)+
-    (d.cat.otherOut?crow('Other debits', d.cat.otherOut, d.counts.otherOut):'')+
+    (d.cat.otherOut?('<div style="font-size:11px;color:var(--text3);margin:4px 0 1px">Other debits ('+d.counts.otherOut+')</div>'+otherLn('otherOut')):'')+
     '<div class="vrow" style="border-top:1px solid var(--border);margin-top:6px;padding-top:6px"><span class="vl" style="font-weight:700">Total in / out</span><span class="vv">'+inr(d.totalDep)+' / '+inr(d.totalWd)+'</span></div>'+
     crow('Closing balance', d.closing||0)+
     '<div style="font-size:11px;color:var(--text3);margin-top:8px">Check: opening + in − out = '+inr((d.opening||0)+d.totalDep-d.totalWd)+' (should equal closing)</div></div>';
