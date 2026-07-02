@@ -1236,9 +1236,9 @@ function commitResetTakeover(){
   renderReconcile();
 }
 
-// ── FINALISE: pin each party to its reconciled 30-Jun balance, keep 8-Apr epoch so July+ entries move it ──
-// Provisional on cash-to-office (₹47,49,758). Update AAMIR target after the morning cash reconciliation.
-var RECON_TARGETS={'AAMIR TRANSPORT':1353047,'ARVINDO':-4349245,'VIKAS COAL':-362730,'TAJ TRADERS':0,'SS TRANSPORT':205640,'BALAJI TRANSPO':10878};
+// ── FINALISE: pin each party to its final balance from the master ledger ("Accounts Dolly Final" → Statement Latest), keep 8-Apr epoch so July+ entries move it ──
+// Aamir: ledger MAT balance owes ₹16,32,745 − ₹10L Taj transfer = ₹6,32,745. Aurobindo: Dolly owes ₹52,436. Others 0 (Vaibhav paid cash; SS/Balaji not in ledger).
+var RECON_TARGETS={'AAMIR TRANSPORT':632745,'ARVINDO':-52436,'VIKAS COAL':0,'VAIBHAV YERAWAR':0,'TAJ TRADERS':0,'SS TRANSPORT':0,'BALAJI TRANSPO':0};
 function previewFinalise(){
   var panel=document.getElementById('reanchorPanel'); if(!panel) return;
   if(!hasPerm('reconcile')){ showToast('No permission'); return; }
@@ -1247,7 +1247,7 @@ function previewFinalise(){
   Object.keys(RECON_TARGETS).forEach(function(nm){ body+=vr(nm, Math.round(getPartyBalance(nm)), RECON_TARGETS[nm]); });
   panel.innerHTML='<div class="card" style="border:1px solid var(--blue)"><div class="card-title">Finalise — set reconciled balances (as of 30-Jun-2026)</div>'+
     body+
-    '<div style="font-size:11px;color:var(--text3);margin-top:8px">Pins each party to its reconciled balance (via opening balance) and keeps the 8-Apr ledger start, so July-onward entries move it from here. Aamir includes the provisional cash-to-office ₹47,49,758 — re-run after the morning cash reconciliation if it changes.</div>'+
+    '<div style="font-size:11px;color:var(--text3);margin-top:8px">Sets each party to its FINAL balance from the master ledger (Accounts Dolly Final → Statement Latest), keeping the 8-Apr ledger start so July-onward entries move it from here. Aamir = ledger ₹16,32,745 owed − ₹10L Taj transfer = ₹6,32,745; Aurobindo Dolly-owes ₹52,436; others nil.</div>'+
     '<div style="margin-top:12px;display:flex;gap:8px"><button class="btn btn-blue" style="width:auto;padding:10px 18px" onclick="commitFinalise()">Confirm &amp; write to ERP</button><button class="btn btn-outline" style="width:auto;padding:10px 18px" onclick="document.getElementById(\'reanchorPanel\').innerHTML=\'\'">Cancel</button></div></div>';
 }
 function commitFinalise(){
@@ -1346,7 +1346,7 @@ function renderBpclResult(d){
   box.innerHTML=summary+table+applyBtn+'<div id="applyPanel" style="margin-top:12px"></div><p style="font-size:12px;color:var(--text3);margin-top:10px">Read-only until you press Apply. Applying stores a dated reconciliation record + the BPCL closing balance and cross-checks invoices against ERP purchases — it does <b>not</b> change any party ledger.</p>';
 }
 
-/* BUILD:bankparser-v7-finalise */
+/* BUILD:bankparser-v8-ledgerfinal */
 // Parse a Union Bank of India "Statement of Account" PDF (deposit/withdrawal by balance movement)
 function parseBankLines(lines){
   var out={period:'', opening:null, closing:null, rows:[],
