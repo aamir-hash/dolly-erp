@@ -1121,11 +1121,36 @@ var reconData=null;
 function renderReconcile(){
   var el=document.getElementById('reportContent');
   if(!hasPerm('reconcile')){ el.innerHTML='<div class="card"><p style="color:var(--text3);text-align:center;padding:20px">🔒 You don\'t have permission to reconcile statements.</p></div>'; return; }
-  el.innerHTML='<div class="card"><div class="card-title">🏦 Reconcile Statements</div>'+
-    '<p style="color:var(--text3);font-size:13px;margin:6px 0 12px">Upload a <b>BPCL statement (PDF)</b> or a <b>bank statement (Excel)</b>. The ERP reads it, sorts every line, and shows the totals so you can check it against your books before anything is saved.</p>'+
+  el.innerHTML=reconSavedHtml()+
+    '<div class="card"><div class="card-title">🏦 Reconcile Statements</div>'+
+    '<p style="color:var(--text3);font-size:13px;margin:6px 0 12px">Upload a <b>BPCL statement (PDF)</b> or a <b>bank statement (PDF)</b>. The ERP reads it, sorts every line, and shows the totals so you can check it against your books. Press <b>Apply</b> to file it as a dated reconciliation record.</p>'+
     '<input type="file" id="reconFile" accept=".pdf,.xlsx,.xls" style="font-size:13px;margin-bottom:10px"/>'+
     '<button class="btn btn-blue" onclick="doReconParse()">Parse file</button>'+
     '<div id="reconResult" style="margin-top:14px"></div></div>';
+}
+function reconSavedHtml(){
+  var s=getReconStore();
+  var months=Object.keys(s.reconciliations||{}).sort().reverse();
+  var out='';
+  if(s.bpclBalance){
+    var b=s.bpclBalance;
+    out+='<div class="card"><div class="card-title">⛽ BPCL account balance</div>'+
+      '<div class="vrow"><span class="vl">Closing (credit) balance</span><span class="vv">'+inr(b.closing||0)+'</span></div>'+
+      '<div style="font-size:11px;color:var(--text3);margin-top:4px">From '+escHtml(b.source||'statement')+' · '+escHtml(b.month||b.period||'')+' · saved '+escHtml(b.asOf||'')+'</div></div>';
+  }
+  if(months.length){
+    var rows=months.map(function(m){
+      var r=s.reconciliations[m], parts=[];
+      ['bank','bpcl'].forEach(function(t){ if(r[t]){
+        var rec=r[t], badFlags=(rec.flags||[]).filter(function(f){return f.status!=='OK';});
+        parts.push('<div style="padding:6px 0;border-top:1px solid var(--border)"><b>'+t.toUpperCase()+'</b> <span style="font-size:11px;color:var(--text3)">applied '+escHtml((rec.appliedAt||'').slice(0,10))+' by '+escHtml(rec.appliedBy||'')+'</span>'+
+          (badFlags.length?badFlags.map(function(f){return '<div style="font-size:12px;color:#b26a00">⚠ '+escHtml(f.detail)+'</div>';}).join(''):'<div style="font-size:12px;color:#1e7d34">✓ cross-checks matched</div>')+'</div>');
+      }});
+      return '<div style="margin-bottom:6px"><div style="font-weight:700">'+m+'</div>'+parts.join('')+'</div>';
+    }).join('');
+    out+='<div class="card"><div class="card-title">📁 Saved reconciliations</div>'+rows+'</div>';
+  }
+  return out;
 }
 async function doReconParse(){
   var box=document.getElementById('reconResult');
@@ -1139,9 +1164,9 @@ async function doReconParse(){
       var lines=await pdfToLines(buf);
       var joined=lines.slice(0,25).join(' ');
       if(/UNION BANK OF INDIA|STATEMENT OF ACCOUNT FOR THE PERIOD/i.test(joined)){
-        var bd=parseBankLines(lines); reconData=bd; renderBankResult(bd);
+        var bd=parseBankLines(lines); reconData={type:'bank',d:bd}; renderBankResult(bd);
       } else {
-        var d=parseBpclLines(lines); reconData=d; renderBpclResult(d);
+        var d=parseBpclLines(lines); reconData={type:'bpcl',d:d}; renderBpclResult(d);
       }
     } else if(name.endsWith('.xlsx')||name.endsWith('.xls')){
       await ensureXlsx();
@@ -1173,10 +1198,11 @@ function renderBpclResult(d){
   var td0='padding:4px 8px;border:1px solid var(--border);font-size:11px';
   var rows=d.rows.map(function(r){ return '<tr><td style="'+td0+'">'+r.date+'</td><td style="'+td0+'">'+escHtml(r.narr)+'</td><td style="'+td+'">'+inr(r.amount)+'</td><td style="'+td0+';text-align:center">'+r.docType+'</td></tr>'; }).join('');
   var table='<div class="card"><div class="card-title">All '+d.rows.length+' lines</div><div class="tbl-wrap"><table style="width:100%;border-collapse:collapse"><thead><tr><th style="'+td0+'">Date</th><th style="'+td0+'">Narration</th><th style="'+td+'">Amount</th><th style="'+td0+'">Type</th></tr></thead><tbody>'+rows+'</tbody></table></div></div>';
-  box.innerHTML=summary+table+'<p style="font-size:12px;color:var(--text3);margin-top:10px">Nothing has been saved — this is a read-only check. Once you confirm the numbers match, I\'ll wire up the "apply" step (record MAT financing, purchases, BPCL balance).</p>';
+  var applyBtn = hasPerm('reconcile') ? '<button class="btn btn-blue" style="margin-top:12px" onclick="previewApply()">✓ Apply / Save reconciliation…</button>' : '';
+  box.innerHTML=summary+table+applyBtn+'<div id="applyPanel" style="margin-top:12px"></div><p style="font-size:12px;color:var(--text3);margin-top:10px">Read-only until you press Apply. Applying stores a dated reconciliation record + the BPCL closing balance and cross-checks invoices against ERP purchases — it does <b>not</b> change any party ledger.</p>';
 }
 
-/* BUILD:bankparser-v2 */
+/* BUILD:bankparser-v3-apply */
 // Parse a Union Bank of India "Statement of Account" PDF (deposit/withdrawal by balance movement)
 function parseBankLines(lines){
   var out={period:'', opening:null, closing:null, rows:[],
@@ -1240,7 +1266,72 @@ function renderBankResult(d){
   var kindLbl={phonepe:'PhonePe',card:'Card',matIn:'MAT in',bpclOut:'BPCL',charges:'Charge',otherIn:'Credit',otherOut:'Debit'};
   var rows=d.rows.map(function(r){ return '<tr><td style="'+td0+'">'+r.date+'</td><td style="'+td0+'">'+escHtml(r.part.slice(0,44))+'</td><td style="'+td+';color:'+(r.dep?'#1e7d34':'#c0392b')+'">'+(r.dep?'+':'−')+inr(r.amt).replace('₹','₹')+'</td><td style="'+td0+';text-align:center">'+(kindLbl[r.kind]||r.kind)+'</td></tr>'; }).join('');
   var table='<div class="card"><div class="card-title">All '+d.rows.length+' transactions</div><div class="tbl-wrap"><table style="width:100%;border-collapse:collapse;min-width:560px"><thead><tr><th style="'+td0+'">Date</th><th style="'+td0+'">Particulars</th><th style="'+td+'">Amount</th><th style="'+td0+'">Type</th></tr></thead><tbody>'+rows+'</tbody></table></div></div>';
-  box.innerHTML=summary+table+'<p style="font-size:12px;color:var(--text3);margin-top:10px">Read-only check — nothing saved. Deposit/withdrawal is derived from the running balance. Once you confirm, I\'ll wire the "apply" step (match PhonePe/card to daily collections, MAT deposits to Aamir\'s ledger, BPCL payments to the BPCL statement).</p>';
+  var applyBtn = hasPerm('reconcile') ? '<button class="btn btn-blue" style="margin-top:12px" onclick="previewApply()">✓ Apply / Save reconciliation…</button>' : '';
+  box.innerHTML=summary+table+applyBtn+'<div id="applyPanel" style="margin-top:12px"></div><p style="font-size:12px;color:var(--text3);margin-top:10px">Read-only until you press Apply. Deposit/withdrawal is derived from the running balance. Applying stores a dated reconciliation record and mismatch flags — it does <b>not</b> change any party ledger.</p>';
+}
+
+// ── APPLY / SAVE a parsed statement as a dated reconciliation record ──
+function reconMonthKey(type,period){
+  if(type==='bank'){ var m=(period||'').match(/(\d{2})-(\d{2})-(\d{4})/); return m?m[3]+'-'+m[2]:null; }
+  var mo={jan:'01',feb:'02',mar:'03',apr:'04',may:'05',jun:'06',jul:'07',aug:'08',sep:'09',oct:'10',nov:'11',dec:'12'};
+  var m=(period||'').match(/(\d{1,2})\s+([A-Za-z]{3})\s+(\d{4})/); return m?m[3]+'-'+(mo[m[2].toLowerCase()]||'01'):null;
+}
+function erpDigitalFor(ym){ var s=0; if(ym) entries.filter(function(e){return e.submitted&&e.date.slice(0,7)===ym;}).forEach(function(e){ s+=(e.upi||0)+(e.swipe||0); }); return Math.round(s); }
+function erpPurchasesFor(ym){ var s=0; if(ym) entries.filter(function(e){return e.submitted&&e.date.slice(0,7)===ym;}).forEach(function(e){ s+=(e.pRcvd||0)*(e.pBuy||0)+(e.dRcvd||0)*(e.dBuy||0); }); return Math.round(s); }
+
+var pendingApply=null;
+function previewApply(){
+  var panel=document.getElementById('applyPanel'); if(!panel) return;
+  if(!hasPerm('reconcile')){ showToast('No permission to reconcile'); return; }
+  if(!reconData||!reconData.d){ panel.innerHTML='<p style="color:#c62828">Parse a statement first.</p>'; return; }
+  var type=reconData.type, d=reconData.d;
+  var ym=reconMonthKey(type,d.period);
+  if(!ym){ panel.innerHTML='<div class="card"><p style="color:#c62828">Could not read the statement month, so it can\'t be saved. Check the period line parsed correctly.</p></div>'; return; }
+  var vr=function(l,v,note){ return '<div class="vrow"><span class="vl">'+l+'</span><span class="vv">'+v+(note?' <span style="font-size:11px;color:var(--text3)">'+note+'</span>':'')+'</span></div>'; };
+  var flags=[], record, bpclBalance=null, body='';
+  if(type==='bank'){
+    var digital=Math.round(d.cat.phonepe+d.cat.card), erpDig=erpDigitalFor(ym), gap=digital-erpDig;
+    var gapOk=Math.abs(gap)<Math.max(2000,erpDig*0.02);
+    flags.push({name:'Digital collections vs ERP', status:gapOk?'OK':'MISMATCH', detail:'Bank PhonePe+card '+inr(digital)+' vs ERP UPI+swipe '+inr(erpDig)+' (gap '+inr(gap)+')'});
+    record={source:'bank', period:d.period, opening:d.opening, closing:d.closing, totalDep:d.totalDep, totalWd:d.totalWd, cat:d.cat, counts:d.counts, erpDigital:erpDig, digitalGap:gap};
+    body = vr('Month', ym)
+      + vr('Deposits / withdrawals', inr(d.totalDep)+' / '+inr(d.totalWd))
+      + vr('Closing balance', inr(d.closing||0))
+      + vr('Digital vs ERP collections', inr(digital)+' vs '+inr(erpDig), (gapOk?'✓ within tolerance':'⚠ gap '+inr(gap)))
+      + '<div style="margin-top:8px;padding:8px;background:var(--bg2);border-radius:8px;font-size:12px;color:var(--text2)">🚛 MAT deposits <b>'+inr(d.cat.matIn)+'</b> ('+d.counts.matIn+') were detected but are <b>NOT</b> posted to Aamir\'s ledger — his balance is governed by the master Excel ledger and the nightly check. This record just files the statement.</div>';
+  } else {
+    var inv=Math.round(d.cat.invoice), erpPur=erpPurchasesFor(ym), pgap=inv-erpPur;
+    var pOk=Math.abs(pgap)<Math.max(5000,erpPur*0.01);
+    flags.push({name:'Invoices vs ERP purchases', status:pOk?'OK':'MISMATCH', detail:'BPCL invoices '+inr(inv)+' vs ERP purchases '+inr(erpPur)+' (gap '+inr(pgap)+')'});
+    record={source:'bpcl', period:d.period, opening:d.opening, closing:d.closing, cat:d.cat, counts:d.counts, erpPurchases:erpPur, invoiceGap:pgap};
+    bpclBalance={asOf:todayStr(), period:d.period, month:ym, opening:d.opening, closing:d.closing, source:'BPCL statement'};
+    body = vr('Month', ym)
+      + vr('Invoices (purchases)', inr(inv), (pOk?'✓ ≈ ERP '+inr(erpPur):'⚠ ERP '+inr(erpPur)+', gap '+inr(pgap)))
+      + vr('Paid via Union Bank', inr(d.cat.bankPay))
+      + vr('MAT BPCL financing', inr(d.cat.matTransfer))
+      + vr('BPCL closing balance', inr(d.closing||0), '→ will be tracked as current BPCL balance');
+  }
+  record.appliedAt=new Date().toISOString(); record.appliedBy=(typeof currentDisplayName!=='undefined'&&currentDisplayName)||'unknown'; record.flags=flags;
+  pendingApply={ym:ym, type:type, record:record, bpclBalance:bpclBalance};
+  var existing=getReconStore().reconciliations[ym];
+  var warn = (existing&&existing[type]) ? '<div style="color:#b26a00;font-size:12px;margin-bottom:6px">⚠ A '+type.toUpperCase()+' record for '+ym+' already exists — saving will overwrite it.</div>' : '';
+  panel.innerHTML='<div class="card" style="border:1px solid var(--blue)"><div class="card-title">Review before saving — '+type.toUpperCase()+' '+ym+'</div>'+warn+body+
+    '<div style="margin-top:12px;display:flex;gap:8px"><button class="btn btn-blue" style="width:auto;padding:10px 18px" onclick="commitApply()">Confirm &amp; Save</button>'+
+    '<button class="btn btn-outline" style="width:auto;padding:10px 18px" onclick="cancelApply()">Cancel</button></div>'+
+    '<p style="font-size:11px;color:var(--text3);margin-top:8px">Saves a reconciliation record'+(type==='bpcl'?' and updates the tracked BPCL balance':'')+'. No party ledger is touched. Syncs to all devices.</p></div>';
+}
+function cancelApply(){ pendingApply=null; var p=document.getElementById('applyPanel'); if(p) p.innerHTML=''; }
+function commitApply(){
+  if(!pendingApply){ return; }
+  if(!hasPerm('reconcile')){ showToast('No permission'); return; }
+  var s=getReconStore();
+  s.reconciliations[pendingApply.ym]=s.reconciliations[pendingApply.ym]||{};
+  s.reconciliations[pendingApply.ym][pendingApply.type]=pendingApply.record;
+  if(pendingApply.bpclBalance) s.bpclBalance=pendingApply.bpclBalance;
+  saveReconStore(s);
+  showToast('✓ '+pendingApply.type.toUpperCase()+' reconciliation saved for '+pendingApply.ym);
+  pendingApply=null;
+  renderReconcile();
 }
 
 // ── RECONCILIATION CHECKER ────────────────────────────────────────
@@ -1873,6 +1964,12 @@ function getPayments(){
 }
 function savePayments(p){ try{ localStorage.setItem(SK_PAYMENTS,JSON.stringify(p)); }catch(e){} if(typeof spSync!=='undefined'&&spSync.active) spSync.schedulePush(); }
 
+// ── Reconciliation apply-store: dated statement records + tracked BPCL balance ──
+// Kept out of party ledgers so it never affects getPartyBalance / the nightly check.
+var SK_RECONAPPLY='dp_reconapply_v1';
+function getReconStore(){ try{ var s=localStorage.getItem(SK_RECONAPPLY); if(s){ var o=JSON.parse(s); o.reconciliations=o.reconciliations||{}; return o; } }catch(e){} return {reconciliations:{}, bpclBalance:null}; }
+function saveReconStore(s){ try{ localStorage.setItem(SK_RECONAPPLY,JSON.stringify(s)); }catch(e){} if(typeof spSync!=='undefined'&&spSync.active) spSync.schedulePush(); }
+
 // Get all credit sales for a party from entries
 function getPartySales(partyName){
   var sales=[];
@@ -2102,6 +2199,17 @@ var spSync = {
         }
       }catch(ex){}
 
+      // Cache applied-reconciliation records + tracked BPCL balance so a blind push
+      // doesn't wipe them. Merge by month key (file authoritative per key, keep local-only months).
+      try{
+        if('reconciliations' in data || 'bpclBalance' in data){
+          var _rs=getReconStore();
+          _rs.reconciliations=Object.assign({}, _rs.reconciliations||{}, data.reconciliations||{});
+          if('bpclBalance' in data && data.bpclBalance) _rs.bpclBalance=data.bpclBalance;
+          localStorage.setItem(SK_RECONAPPLY, JSON.stringify(_rs));
+        }
+      }catch(ex){}
+
       // cloud is the source of truth for deletion tombstones, so BOTH deletes and re-entries propagate
       var deletedSet = data.deletedDates || [];
       saveDeleted(deletedSet);
@@ -2207,6 +2315,8 @@ var spSync = {
         reconCheck: _rc.reconCheck||null,
         reconCheckStatus: _rc.reconCheckStatus||null,
         reconCheckSummary: _rc.reconCheckSummary||null,
+        reconciliations: (getReconStore().reconciliations)||{},
+        bpclBalance: (getReconStore().bpclBalance)||null,
         lastUpdated: new Date().toISOString(),
         updatedBy: currentDisplayName||'unknown'
       });
