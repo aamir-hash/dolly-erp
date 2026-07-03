@@ -1435,7 +1435,7 @@ function renderBpclResult(d){
   box.innerHTML=summary+table+applyBtn+'<div id="applyPanel" style="margin-top:12px"></div><p style="font-size:12px;color:var(--text3);margin-top:10px">Read-only until you press Apply. Applying stores a dated reconciliation record + the BPCL closing balance and cross-checks invoices against ERP purchases — it does <b>not</b> change any party ledger.</p>';
 }
 
-/* BUILD:bankparser-v10-ver2.1 */
+/* BUILD:bankparser-v11-partynote */
 // Parse a Union Bank of India "Statement of Account" PDF (deposit/withdrawal by balance movement)
 function parseBankLines(lines){
   var out={period:'', opening:null, closing:null, rows:[],
@@ -2336,7 +2336,9 @@ function renderParties(){
       '<div style="text-align:right">'+
         '<div style="font-size:16px;font-weight:700;'+(bal>0?'color:var(--red)':'color:var(--green)')+'">'+inr(Math.abs(bal))+'</div>'+
         '<div style="font-size:10px;color:var(--text3)">'+(bal>0?'Outstanding':(bal<0?'Overpaid':'Clear'))+'</div>'+
-      '</div></div></div>';
+      '</div></div>'+
+      (p.note?'<div style="font-size:11px;color:#b26a00;background:#fff8e1;border:1px solid #ffe08a;border-radius:6px;padding:5px 8px;margin-top:8px">⚠ '+escHtml(p.note)+'</div>':'')+
+      '</div>';
   }).join('');
 
   // Summary bar
