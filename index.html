@@ -1384,10 +1384,11 @@ function commitFinalise(){
     var p=parties.find(function(x){ return x.name===nm; }); if(!p) return;
     var computed=getPartyBalance(nm); // = salesFrom8Apr − paysFrom8Apr (opening 0)
     p.openingBalance=Math.round((T[nm]-computed)*100)/100;
+    if(p.note && (/4,?86,?326/.test(p.note) || /cash/i.test(p.note))) p.note=''; // open cash item resolved 3-Jul (cash confirmed ₹55,56,998)
     p.updatedAt=new Date().toISOString();
   });
   saveParties(parties);
-  var s=getReconStore(); s.finalised={at:new Date().toISOString(), by:(typeof currentDisplayName!=='undefined'&&currentDisplayName)||'unknown', targets:T, source:pendingFinalise.srcNote, cashProvisional:true}; saveReconStore(s);
+  var s=getReconStore(); s.finalised={at:new Date().toISOString(), by:(typeof currentDisplayName!=='undefined'&&currentDisplayName)||'unknown', targets:T, source:pendingFinalise.srcNote, cashProvisional:false}; saveReconStore(s);
   showToast('✓ Reconciliation finalised — Aamir '+inr(getPartyBalance('AAMIR TRANSPORT')));
   pendingFinalise=null;
   renderReconcile();
