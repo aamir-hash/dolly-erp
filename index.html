@@ -1237,8 +1237,9 @@ function commitResetTakeover(){
 }
 
 // ── FINALISE: pin each party to its final balance from the master ledger ("Accounts Dolly Final" → Statement Latest), keep 8-Apr epoch so July+ entries move it ──
-// Aamir: ledger MAT balance owes ₹16,32,745 − ₹10L Taj transfer = ₹6,32,745. Aurobindo: Dolly owes ₹52,436. Others 0 (Vaibhav paid cash; SS/Balaji not in ledger).
-var RECON_TARGETS={'AAMIR TRANSPORT':632745,'ARVINDO':-52436,'VIKAS COAL':0,'VAIBHAV YERAWAR':0,'TAJ TRADERS':0,'SS TRANSPORT':0,'BALAJI TRANSPO':0};
+// Aamir = fuel ₹1,23,52,993 + cash-to-MAT ₹51,03,878 − infused ₹1,63,10,452 − ₹10L Taj = owes ₹1,46,419.
+// NOTE: cash-to-MAT here uses Aamir's cash-received LIST (₹51,03,878). The master ledger's cash line is ₹55,90,204 — a ₹4,86,326 difference to be resolved (Aamir's 1 last cash confirmation). If cash → ₹55,90,204, Aamir = ₹6,32,745.
+var RECON_TARGETS={'AAMIR TRANSPORT':146419,'ARVINDO':-52436,'VIKAS COAL':0,'VAIBHAV YERAWAR':0,'TAJ TRADERS':0,'SS TRANSPORT':0,'BALAJI TRANSPO':0};
 function previewFinalise(){
   var panel=document.getElementById('reanchorPanel'); if(!panel) return;
   if(!hasPerm('reconcile')){ showToast('No permission'); return; }
@@ -1296,6 +1297,80 @@ function reconSavedHtml(){
   }
   return out;
 }
+// Parse a Union Bank statement in Excel (Withdrawals/Deposits columns) → same shape as parseBankLines
+function parseBankXlsx(aoa){
+  var out={period:'', opening:null, closing:null, rows:[],
+    cat:{phonepe:0,card:0,matIn:0,bpclOut:0,charges:0,ccInterest:0,otherIn:0,otherOut:0},
+    counts:{phonepe:0,card:0,matIn:0,bpclOut:0,charges:0,ccInterest:0,otherIn:0,otherOut:0},
+    totalDep:0,totalWd:0};
+  var ci={date:0,rem:2,wd:6,dep:7,bal:8}, hr=-1;
+  for(var r=0;r<Math.min(aoa.length,30);r++){
+    var low=(aoa[r]||[]).map(function(x){return String(x==null?'':x).toLowerCase();}); var joined=low.join(' ');
+    if(!out.period){ var pm=joined.match(/from\s+(.+?\d{4})\s+to\s+(.+?\d{4})/); if(pm) out.period=(pm[1]+' → '+pm[2]).replace(/\s+/g,' ').trim(); }
+    if(/withdrawal/.test(joined)&&/deposit/.test(joined)){ hr=r; low.forEach(function(x,i){
+      if(/date/.test(x)) ci.date=i; else if(/remark|particular|narrat/.test(x)) ci.rem=i; else if(/withdrawal|debit/.test(x)) ci.wd=i; else if(/deposit|credit/.test(x)) ci.dep=i; else if(/balance/.test(x)) ci.bal=i; }); break; }
+  }
+  if(hr<0) throw new Error('Not a Union Bank statement (no Withdrawals/Deposits header).');
+  function n(v){ if(v==null||v==='')return null; var f=parseFloat(String(v).replace(/,/g,'')); return isNaN(f)?null:f; }
+  function fmtd(v){ if(v instanceof Date){ return String(v.getUTCDate()).padStart(2,'0')+'-'+String(v.getUTCMonth()+1).padStart(2,'0')+'-'+v.getUTCFullYear(); } return String(v==null?'':v).slice(0,10); }
+  var first=true;
+  for(var r2=hr+1;r2<aoa.length;r2++){
+    var row=aoa[r2]||[]; var rem=String(row[ci.rem]==null?'':row[ci.rem]).replace(/\s+/g,' ').trim();
+    var wd=n(row[ci.wd]), dep=n(row[ci.dep]), bal=n(row[ci.bal]);
+    if(rem===''&&wd==null&&dep==null) continue;
+    var isdep=dep!=null&&dep>0; var amt=isdep?dep:(wd||0); if(!amt&&bal==null) continue;
+    if(first&&bal!=null){ out.opening=Math.round((bal-(isdep?amt:-amt))*100)/100; first=false; }
+    if(bal!=null) out.closing=bal;
+    var P=rem.toUpperCase(), kind;
+    if(/PHONEPE/.test(P)) kind='phonepe';
+    else if(/PINE LABS|CREDIT CARD/.test(P)) kind='card';
+    else if(/MOHAMMAD AMIR|MOHD AMIR|MOHD/.test(P)) kind='matIn';
+    else if(/BHARAT PETROLEUM/.test(P)) kind='bpclOut';
+    else if(!isdep&&/DOLLY PETROLEUM/.test(P)) kind='ccInterest';
+    else if(/CHARGE/.test(P)) kind='charges';
+    else kind=isdep?'otherIn':'otherOut';
+    out.cat[kind]+=amt; out.counts[kind]++;
+    if(isdep) out.totalDep+=amt; else out.totalWd+=amt;
+    out.rows.push({date:fmtd(row[ci.date]), part:rem, amt:amt, dep:isdep, kind:kind});
+  }
+  return out;
+}
+// Parse a BPCL statement in Excel (Document Narration + Dr/Cr) → same shape as parseBpclLines
+function parseBpclXlsx(aoa){
+  var out={period:'', opening:null, closing:null, rows:[], cat:{invoice:0,charge:0,bankPay:0,matTransfer:0,discount:0,other:0}, counts:{invoice:0,charge:0,bankPay:0,matTransfer:0,discount:0,other:0}};
+  var ci={date:1,chq:3,docno:4,narr:5,dr:6,cr:7}, hr=-1;
+  for(var r=0;r<Math.min(aoa.length,20);r++){
+    var low=(aoa[r]||[]).map(function(x){return String(x==null?'':x).toLowerCase();}); var joined=low.join(' ');
+    if(/document narration/.test(joined)){ hr=r; low.forEach(function(x,i){
+      if(/document date/.test(x)) ci.date=i; else if(/cheque|dd no/.test(x)) ci.chq=i; else if(/document no/.test(x)) ci.docno=i; else if(/narration/.test(x)) ci.narr=i; else if(/\(a\)|\(dr/.test(x)) ci.dr=i; else if(/\(b\)|\(cr/.test(x)) ci.cr=i; }); break; }
+  }
+  if(hr<0) throw new Error('Not a BPCL statement (no Document Narration header).');
+  function n(v){ if(v==null||v==='')return null; var f=parseFloat(String(v).replace(/,/g,'')); return isNaN(f)?null:f; }
+  function fmtd(v){ if(v instanceof Date){ return String(v.getUTCDate()).padStart(2,'0')+'-'+String(v.getUTCMonth()+1).padStart(2,'0')+'-'+v.getUTCFullYear(); } return String(v==null?'':v).slice(0,10); }
+  for(var r3=hr+1;r3<aoa.length;r3++){
+    var row=aoa[r3]||[]; var narr=String(row[ci.narr]==null?'':row[ci.narr]).replace(/\s+/g,' ').trim(); var up=narr.toUpperCase();
+    var dr=n(row[ci.dr]), cr=n(row[ci.cr]);
+    if(/OPENING BALAN/.test(up)){ if(out.opening==null) out.opening=(cr!=null?cr:dr); continue; }
+    if(/CLOSING BALAN/.test(up)){ out.closing=(cr!=null?cr:dr); continue; }
+    if(dr==null&&cr==null) continue;
+    var s=String(row[ci.docno]||'')+' '+String(row[ci.chq]||'')+' '+up; var kind='other';
+    if(/INVOICE/.test(up)) kind='invoice'; else if(/LFR|ME SHARE/.test(up)) kind='charge'; else if(/UBIN/.test(up)) kind='bankPay'; else if(/347093|347094/.test(s)) kind='matTransfer'; else if(/DISC/.test(up)) kind='discount';
+    var amt=(dr!=null?dr:cr);
+    out.cat[kind]+=amt; out.counts[kind]++;
+    out.rows.push({date:fmtd(row[ci.date]), narr:narr, amount:amt, docType:(dr!=null?'Dr':'Cr'), kind:kind});
+  }
+  return out;
+}
+function bpclMiniCard(d){
+  return '<div class="card"><div class="card-title">⛽ BPCL statement (also parsed) — '+escHtml(d.period||'')+'</div>'+
+    '<div class="vrow"><span class="vl">Opening</span><span class="vv">'+inr(d.opening||0)+'</span></div>'+
+    '<div class="vrow"><span class="vl">🛢️ Diesel invoices (purchases)</span><span class="vv">'+inr(d.cat.invoice)+' <span style="font-size:11px;color:var(--text3)">('+d.counts.invoice+')</span></span></div>'+
+    '<div class="vrow"><span class="vl">🏦 Bank payments (UBIN)</span><span class="vv">'+inr(d.cat.bankPay)+'</span></div>'+
+    '<div class="vrow"><span class="vl">🚛 MAT transfers (347093/4)</span><span class="vv">'+inr(d.cat.matTransfer)+'</span></div>'+
+    (d.cat.discount?'<div class="vrow"><span class="vl">BPCL discount</span><span class="vv">'+inr(d.cat.discount)+'</span></div>':'')+
+    (d.cat.charge?'<div class="vrow"><span class="vl">LFR/ME charges</span><span class="vv">'+inr(d.cat.charge)+'</span></div>':'')+
+    '<div class="vrow"><span class="vl">Closing</span><span class="vv">'+inr(d.closing||0)+'</span></div></div>';
+}
 async function doReconParse(){
   var box=document.getElementById('reconResult');
   var f=(document.getElementById('reconFile')||{}).files; f=f&&f[0];
@@ -1314,7 +1389,21 @@ async function doReconParse(){
       }
     } else if(name.endsWith('.xlsx')||name.endsWith('.xls')){
       await ensureXlsx();
-      box.innerHTML='<p style="color:var(--text3)">Excel bank statement detected — the PDF parser is live; Excel parsing can be added when you switch formats.</p>';
+      var buf2=await f.arrayBuffer();
+      var wbk=XLSX.read(buf2,{type:'array',cellDates:true});
+      var bankD=null,bpclD=null;
+      wbk.SheetNames.forEach(function(sn){
+        var aoa=XLSX.utils.sheet_to_json(wbk.Sheets[sn],{header:1,raw:true,defval:''});
+        var flat=aoa.slice(0,25).map(function(rw){return (rw||[]).join(' ');}).join(' ').toLowerCase();
+        try{
+          if(!bankD && /withdrawal/.test(flat) && /deposit/.test(flat)) bankD=parseBankXlsx(aoa);
+          else if(!bpclD && /document narration/.test(flat)) bpclD=parseBpclXlsx(aoa);
+        }catch(e){}
+      });
+      if(bankD&&bpclD){ reconData={type:'bank',d:bankD}; renderBankResult(bankD); box.innerHTML=bpclMiniCard(bpclD)+box.innerHTML; }
+      else if(bankD){ reconData={type:'bank',d:bankD}; renderBankResult(bankD); }
+      else if(bpclD){ reconData={type:'bpcl',d:bpclD}; renderBpclResult(bpclD); }
+      else { box.innerHTML='<p style="color:#c62828">Couldn\'t recognise this Excel as a UBI or BPCL statement (looked for Withdrawals/Deposits columns, or a Document Narration column).</p>'; }
     } else { box.innerHTML='<p style="color:#c62828">Unsupported file type.</p>'; }
   }catch(e){ box.innerHTML='<p style="color:#c62828">Could not parse: '+escHtml(e.message)+'</p>'; }
 }
@@ -1346,7 +1435,7 @@ function renderBpclResult(d){
   box.innerHTML=summary+table+applyBtn+'<div id="applyPanel" style="margin-top:12px"></div><p style="font-size:12px;color:var(--text3);margin-top:10px">Read-only until you press Apply. Applying stores a dated reconciliation record + the BPCL closing balance and cross-checks invoices against ERP purchases — it does <b>not</b> change any party ledger.</p>';
 }
 
-/* BUILD:bankparser-v8-ledgerfinal */
+/* BUILD:bankparser-v9-xlsx-and-cashfinal */
 // Parse a Union Bank of India "Statement of Account" PDF (deposit/withdrawal by balance movement)
 function parseBankLines(lines){
   var out={period:'', opening:null, closing:null, rows:[],
