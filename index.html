@@ -250,7 +250,7 @@ tr.hi-row td{background:rgba(255,220,2,.06)}
   <button class="sbn" onclick="nav(4)" id="sbn4" data-tab="4"><span class="sb-ic">🕐</span>History</button>
   <div class="sb-group">System</div>
   <button class="sbn" onclick="nav(5)" id="sbn5" data-tab="5"><span class="sb-ic">⚙️</span>Settings</button>
-  <div class="sb-foot">Operations ERP · v2.3</div>
+  <div class="sb-foot">Operations ERP · v2.4</div>
 </div>
 
 <div class="bnav">
@@ -285,7 +285,6 @@ tr.hi-row td{background:rgba(255,220,2,.06)}
     <button class="rtab" onclick="rTab(1,this)">Weekly</button>
     <button class="rtab" onclick="rTab(2,this)">Monthly</button>
     <button class="rtab" onclick="rTab(3,this)">All-time</button>
-    <button class="rtab" onclick="rTab(4,this)">🔍 Check</button>
     <button class="rtab" onclick="rTab(5,this)">🏦 Reconcile</button>
     <button class="rtab" onclick="rTab(6,this)">📋 DSR</button>
     <button class="rtab" onclick="rTab(7,this)">💵 Cash Match</button>
@@ -396,7 +395,7 @@ tr.hi-row td{background:rgba(255,220,2,.06)}
     <div class="vrow"><span class="vl">Signed in as</span><span class="vv info" id="s-loggedIn">—</span></div>
     <div class="vrow"><span class="vl">Total entries</span><span class="vv info" id="s-count">—</span></div>
     <div class="vrow"><span class="vl">Last entry</span><span class="vv" id="s-last">—</span></div>
-    <div class="vrow"><span class="vl">Version</span><span class="vv muted">2.3 · Jul 2026</span></div>
+    <div class="vrow"><span class="vl">Version</span><span class="vv muted">2.4 · Jul 2026</span></div>
   </div>
 </div>
 
@@ -1606,7 +1605,7 @@ function renderBpclResult(d){
   box.innerHTML=summary+table+applyBtn+'<div id="applyPanel" style="margin-top:12px"></div><p style="font-size:12px;color:var(--text3);margin-top:10px">Read-only until you press Apply. Applying stores a dated reconciliation record + the BPCL closing balance and cross-checks invoices against ERP purchases — it does <b>not</b> change any party ledger.</p>';
 }
 
-/* BUILD:rpc-redesign-v14-sidebar */
+/* BUILD:rpc-redesign-v15-tidyup */
 // Parse a Union Bank of India "Statement of Account" PDF (deposit/withdrawal by balance movement)
 function parseBankLines(lines){
   var out={period:'', opening:null, closing:null, rows:[],
@@ -2513,6 +2512,10 @@ function showPartyDetail(name){
 
 function renderParties(){
   var parties=getParties();
+  // Self-heal: the ₹4,86,326 cash open item was resolved 3-Jul (cash confirmed ₹55,56,998). Clear the stale banner from any synced data.
+  var noteChanged=false;
+  parties.forEach(function(p){ if(p.note && (/4,?86,?326|cash-to-MAT|unreconciled|open item/i.test(p.note))){ p.note=''; noteChanged=true; } });
+  if(noteChanged) saveParties(parties);
   var totalOut=0;
   var cards=parties.map(function(p,i){
     var bal=getPartyBalance(p.name);
