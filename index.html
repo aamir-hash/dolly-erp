@@ -24,6 +24,23 @@ body{font-family:var(--font);background:var(--bg);color:var(--text);font-size:14
 .bn-icon{font-size:21px;display:block;margin-bottom:1px}
 .bn-label{font-size:9px;font-weight:700;color:var(--text3);letter-spacing:.04em;text-transform:uppercase}
 .bn.active .bn-label{color:var(--blue)}
+/* SIDEBAR (desktop only) */
+.sidebar{display:none}
+.sb-brand{display:flex;align-items:center;gap:10px;padding:4px 8px 16px}
+.sb-logo{width:36px;height:36px;background:var(--yellow);border-radius:9px;display:flex;align-items:center;justify-content:center;font:800 13px/1 var(--font);color:var(--navy);flex-shrink:0}
+.sb-bt{color:#fff;font-weight:800;font-size:15px;line-height:1.15}
+.sb-bs{color:#6E88B0;font-size:10px;margin-top:1px}
+.sb-group{color:#6E88B0;font-size:10px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;margin:14px 10px 6px}
+.sbn{display:flex;align-items:center;gap:11px;padding:10px 12px;border-radius:8px;color:#C5D2E6;font-size:14px;font-weight:600;cursor:pointer;border:none;background:none;width:100%;text-align:left;font-family:var(--font);margin-bottom:2px;border-left:3px solid transparent}
+.sbn:hover{background:rgba(255,255,255,.06);color:#fff}
+.sbn.sbn-active{background:rgba(253,185,19,.14);color:var(--yellow);font-weight:700;border-left-color:var(--yellow)}
+.sbn .sb-ic{font-size:16px;width:20px;text-align:center;flex-shrink:0}
+.sb-foot{margin-top:auto;padding:12px 10px 4px;border-top:1px solid rgba(255,255,255,.12);color:#8FA8CC;font-size:11px;line-height:1.5}
+@media(min-width:900px){
+  body{padding-left:236px}
+  .bnav{display:none}
+  .sidebar{display:flex;flex-direction:column;position:fixed;top:0;left:0;bottom:0;width:236px;background:var(--navy);z-index:250;padding:14px 12px;overflow-y:auto}
+}
 /* PAGES */
 .page{display:none;max-width:680px;margin:0 auto;padding:14px}
 /* Wider layout on tablets/desktops so tables (DSR, Cash Match, registers) fit without horizontal scroll */
@@ -223,13 +240,25 @@ tr.hi-row td{background:rgba(255,220,2,.06)}
   </div>
 </div>
 
+<div class="sidebar" id="sidebar">
+  <div class="sb-brand"><div class="sb-logo">DP</div><div><div class="sb-bt">Dolly Petroleum</div><div class="sb-bs">BPCL Dealer · Chandrapur</div></div></div>
+  <div class="sb-group">Operations</div>
+  <button class="sbn sbn-active" onclick="nav(0)" id="sbn0" data-tab="0"><span class="sb-ic">✏️</span>Daily Entry</button>
+  <button class="sbn" onclick="nav(2)" id="sbn2" data-tab="2"><span class="sb-ic">📊</span>Reports</button>
+  <div class="sb-group">Money</div>
+  <button class="sbn" onclick="nav(3)" id="sbn3" data-tab="3"><span class="sb-ic">🤝</span>Credit Parties</button>
+  <button class="sbn" onclick="nav(4)" id="sbn4" data-tab="4"><span class="sb-ic">🕐</span>History</button>
+  <div class="sb-group">System</div>
+  <button class="sbn" onclick="nav(5)" id="sbn5" data-tab="5"><span class="sb-ic">⚙️</span>Settings</button>
+  <div class="sb-foot">Operations ERP · v2.3</div>
+</div>
+
 <div class="bnav">
-  <button class="bn active" onclick="nav(0)" id="bn0"><span class="bn-icon">✏️</span><span class="bn-label">Entry</span></button>
-  <button class="bn" onclick="nav(1)" id="bn1"><span class="bn-icon">📋</span><span class="bn-label">Today</span></button>
-  <button class="bn" onclick="nav(2)" id="bn2"><span class="bn-icon">📊</span><span class="bn-label">Reports</span></button>
-  <button class="bn" onclick="nav(3)" id="bn3"><span class="bn-icon">🤝</span><span class="bn-label">Parties</span></button>
-  <button class="bn" onclick="nav(4)" id="bn4"><span class="bn-icon">🕐</span><span class="bn-label">History</span></button>
-  <button class="bn" onclick="nav(5)" id="bn5"><span class="bn-icon">⚙️</span><span class="bn-label">Settings</span></button>
+  <button class="bn active" onclick="nav(0)" id="bn0" data-tab="0"><span class="bn-icon">✏️</span><span class="bn-label">Entry</span></button>
+  <button class="bn" onclick="nav(2)" id="bn2" data-tab="2"><span class="bn-icon">📊</span><span class="bn-label">Reports</span></button>
+  <button class="bn" onclick="nav(3)" id="bn3" data-tab="3"><span class="bn-icon">🤝</span><span class="bn-label">Parties</span></button>
+  <button class="bn" onclick="nav(4)" id="bn4" data-tab="4"><span class="bn-icon">🕐</span><span class="bn-label">History</span></button>
+  <button class="bn" onclick="nav(5)" id="bn5" data-tab="5"><span class="bn-icon">⚙️</span><span class="bn-label">Settings</span></button>
 </div>
 
 <!-- ═══════════════════════════════════════════ PAGE 0: ENTRY ═══ -->
@@ -367,7 +396,7 @@ tr.hi-row td{background:rgba(255,220,2,.06)}
     <div class="vrow"><span class="vl">Signed in as</span><span class="vv info" id="s-loggedIn">—</span></div>
     <div class="vrow"><span class="vl">Total entries</span><span class="vv info" id="s-count">—</span></div>
     <div class="vrow"><span class="vl">Last entry</span><span class="vv" id="s-last">—</span></div>
-    <div class="vrow"><span class="vl">Version</span><span class="vv muted">2.2 · Jul 2026</span></div>
+    <div class="vrow"><span class="vl">Version</span><span class="vv muted">2.3 · Jul 2026</span></div>
   </div>
 </div>
 
@@ -543,8 +572,12 @@ var curPage=0, curStep=0, curRTab=0;
 function nav(i){
   var allowed=allowedTabs();
   if(allowed.indexOf(i)<0){ i=allowed[0]; }
-  document.querySelectorAll('.page').forEach(function(p,j){ p.classList.toggle('active',i===j); });
-  document.querySelectorAll('.bn').forEach(function(b,j){ b.classList.toggle('active',i===j); });
+  document.querySelectorAll('.page').forEach(function(p){ p.classList.remove('active'); });
+  var pg=document.getElementById('page'+i); if(pg) pg.classList.add('active');
+  document.querySelectorAll('.bn').forEach(function(b){ b.classList.remove('active'); });
+  var bn=document.getElementById('bn'+i); if(bn) bn.classList.add('active');
+  document.querySelectorAll('.sbn').forEach(function(b){ b.classList.remove('sbn-active'); });
+  var sb=document.getElementById('sbn'+i); if(sb) sb.classList.add('sbn-active');
   curPage=i; window.scrollTo(0,0);
   if(i===0) initEntry();
   if(i===1) renderToday();
@@ -1573,7 +1606,7 @@ function renderBpclResult(d){
   box.innerHTML=summary+table+applyBtn+'<div id="applyPanel" style="margin-top:12px"></div><p style="font-size:12px;color:var(--text3);margin-top:10px">Read-only until you press Apply. Applying stores a dated reconciliation record + the BPCL closing balance and cross-checks invoices against ERP purchases — it does <b>not</b> change any party ledger.</p>';
 }
 
-/* BUILD:rpc-redesign-v13-cashfinal */
+/* BUILD:rpc-redesign-v14-sidebar */
 // Parse a Union Bank of India "Statement of Account" PDF (deposit/withdrawal by balance movement)
 function parseBankLines(lines){
   var out={period:'', opening:null, closing:null, rows:[],
@@ -2774,7 +2807,7 @@ function isAdmin(){ return currentRole==='admin'; }
 
 // ── ROLE PERMISSIONS MATRIX (Admin / Operator) ────────────────────
 var PERMS=[
-  {k:'dashboard',  i:'🏠', n:'Dashboard',            d:'View home & live stats',            tab:1},
+  {k:'dashboard',  i:'🏠', n:'Today summary',         d:'Post-save daily summary view',      tab:1},
   {k:'dailyEntry', i:'📋', n:'Daily Entry',           d:'Submit daily reports',              tab:0},
   {k:'records',    i:'🗂️', n:'Records',               d:'View past submitted reports',       tab:4},
   {k:'reports',    i:'📊', n:'Reports',               d:'Monthly summary & DSR',             tab:2},
@@ -2797,7 +2830,7 @@ function roleKey(){ return currentRole==='admin'?'admin':'operator'; }
 function hasPerm(key){ var rp=getRolePerms(); var r=rp[roleKey()]; return r? !!r[key] : (currentRole==='admin'); }
 function allowedTabs(){
   var a=[]; PERMS.forEach(function(p){ if(p.tab!=null && hasPerm(p.k)) a.push(p.tab); });
-  return a.length? a.sort(function(x,y){return x-y;}) : [1];
+  return a.length? a.sort(function(x,y){return x-y;}) : [0];
 }
 // Entry/value editing is now permission-driven (admins can toggle it for Operators).
 function canEdit(){ return hasPerm('editEntries'); }
@@ -2889,7 +2922,7 @@ function resolveRole(){
 
 function applyRoleUI(){
   var allowed=allowedTabs();
-  document.querySelectorAll('.bn').forEach(function(b,i){ b.style.display=allowed.indexOf(i)>=0?'':'none'; });
+  document.querySelectorAll('[data-tab]').forEach(function(b){ var t=parseInt(b.getAttribute('data-tab'),10); b.style.display=allowed.indexOf(t)>=0?'':'none'; });
   var tb=document.getElementById('tbUser');
   if(tb) tb.innerHTML='<div class="tb-uname">'+escHtml(currentDisplayName)+'</div><div class="tb-urole">'+currentRole+'</div>';
 }
