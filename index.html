@@ -6,13 +6,13 @@
 <meta name="apple-mobile-web-app-capable" content="yes"/>
 <meta name="apple-mobile-web-app-title" content="Dolly Ops"/>
 <title>Dolly Petroleum — Operations</title>
-<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;600;700;800&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Public+Sans:wght@400;500;600;700;800;900&display=swap" rel="stylesheet"/>
 <style>
 *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
-:root{--blue:#017DC5;--blue-d:#015f96;--blue-l:#e8f4fd;--yellow:#FFDC02;--yellow-d:#e6c600;--green:#0a8f5c;--green-bg:#e6f7f1;--red:#d93025;--red-bg:#fce8e6;--amber:#c97a00;--amber-bg:#fff3e0;--bg:#f2f7fb;--bg2:#fff;--border:#cde0f0;--text:#0a1f30;--text2:#3a6080;--text3:#7a9db8;--mono:'DM Mono',monospace;--font:'DM Sans',sans-serif}
-body{font-family:var(--font);background:var(--bg);color:var(--text);font-size:14px;padding-bottom:68px;min-height:100vh}
+:root{--navy:#002A5E;--blue:#003C82;--blue-d:#002A5E;--blue-l:#E8F0FA;--yellow:#FDB913;--yellow-d:#E0A800;--green:#1B8A5A;--green-bg:#E7F4EE;--red:#C4362C;--red-bg:#FBE9E7;--amber:#9A7400;--amber-bg:#FEF3D6;--bg:#F1F4F8;--bg2:#fff;--border:#E1E5EA;--text:#101922;--text2:#62707F;--text3:#8A929C;--mono:'Public Sans',sans-serif;--font:'Public Sans',sans-serif}
+body{font-family:var(--font);background:var(--bg);color:var(--text);font-size:14px;padding-bottom:68px;min-height:100vh;font-variant-numeric:tabular-nums;-webkit-font-smoothing:antialiased}
 /* TOPBAR */
-.topbar{background:var(--blue);padding:0 16px;height:54px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:200;box-shadow:0 2px 8px rgba(1,80,150,.2)}
+.topbar{background:var(--navy);padding:0 16px;height:54px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:200;box-shadow:0 1px 0 rgba(0,0,0,.06)}
 .topbar::after{content:'';position:absolute;bottom:0;left:0;right:0;height:3px;background:var(--yellow)}
 .tb-left{display:flex;align-items:center;gap:10px}
 .tb-logo{width:34px;height:34px;background:var(--yellow);border-radius:8px;display:flex;align-items:center;justify-content:center;font:700 12px/1 var(--mono);color:var(--blue);flex-shrink:0}
@@ -31,7 +31,7 @@ body{font-family:var(--font);background:var(--bg);color:var(--text);font-size:14
 @media(min-width:1100px){ .page{max-width:1200px} }
 .page.active{display:block}
 /* CARD */
-.card{background:var(--bg2);border:1.5px solid var(--border);border-radius:12px;padding:16px;margin-bottom:12px;box-shadow:0 2px 8px rgba(1,125,197,.06)}
+.card{background:var(--bg2);border:1px solid var(--border);border-radius:12px;padding:18px;margin-bottom:12px}
 .card-title{font-size:11px;font-weight:700;color:var(--blue);text-transform:uppercase;letter-spacing:.08em;margin-bottom:12px;padding-bottom:9px;border-bottom:2px solid var(--blue-l);display:flex;align-items:center;gap:8px}
 .card-title::before{content:'';display:inline-block;width:3px;height:12px;background:var(--yellow);border-radius:2px}
 .card-sub{font-size:10px;font-weight:700;color:var(--blue);text-transform:uppercase;letter-spacing:.06em;margin:10px 0 8px}
@@ -78,11 +78,11 @@ body{font-family:var(--font);background:var(--bg);color:var(--text);font-size:14
 /* TABLES */
 .tbl-wrap{overflow-x:auto;border-radius:10px;border:1.5px solid var(--border)}
 table{width:100%;border-collapse:collapse;font-size:11px}
-th{text-align:left;padding:8px 10px;background:var(--blue);color:rgba(255,255,255,.85);font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;border-bottom:2px solid var(--yellow);white-space:nowrap}
-td{padding:7px 10px;border-bottom:1px solid #f0f7fd;vertical-align:middle}
+th{text-align:left;padding:9px 10px;background:#FAFBFC;color:#98A0AB;font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.05em;border-bottom:1px solid #EEF1F5;white-space:nowrap}
+td{padding:9px 10px;border-bottom:1px solid #F2F4F7;vertical-align:middle}
 td.r{text-align:right;font-family:var(--mono)}td.c{text-align:center}
-tr:hover td{background:#f0f7fd}tr:last-child td{border-bottom:none}
-tr.total-row td{background:rgba(1,125,197,.06);font-weight:700;border-top:2px solid var(--border)}
+tr:hover td{background:#F6F9FD}tr:last-child td{border-bottom:none}
+tr.total-row td{background:#F6F9FD;font-weight:800;border-top:1px solid var(--border)}
 tr.loss-row td{background:rgba(217,48,37,.03)}
 tr.hi-row td{background:rgba(255,220,2,.06)}
 /* BAR */
@@ -101,7 +101,7 @@ tr.hi-row td{background:rgba(255,220,2,.06)}
 .alert-a{background:var(--amber-bg);color:var(--amber);border:1.5px solid rgba(201,122,0,.2)}
 .alert-r{background:var(--red-bg);color:var(--red);border:1.5px solid rgba(217,48,37,.2)}
 /* HERO */
-.hero{background:linear-gradient(135deg,var(--blue-d),var(--blue));border-radius:12px;padding:18px;margin-bottom:14px;position:relative;overflow:hidden}
+.hero{background:linear-gradient(135deg,var(--navy),#013C7A);border-radius:12px;padding:18px;margin-bottom:14px;position:relative;overflow:hidden}
 .hero::after{content:'';position:absolute;top:-20px;right:-20px;width:80px;height:80px;background:var(--yellow);border-radius:50%;opacity:.12}
 .hero h2{font-size:17px;font-weight:800;color:#fff;margin-bottom:3px}
 .hero p{font-size:11px;color:rgba(255,255,255,.65);font-family:var(--mono)}
@@ -167,7 +167,7 @@ tr.hi-row td{background:rgba(255,220,2,.06)}
 @media(min-width:600px){.kpi-grid{grid-template-columns:repeat(4,1fr)}.kpi-grid-4{grid-template-columns:repeat(4,1fr)}}
 @media print{.topbar,.bnav,.btn,.rtabs,.modal-overlay,.tabbar{display:none!important}.page{display:none!important}.page.active{display:block!important}body{background:#fff}}
 /* LOGIN */
-.login-overlay{position:fixed;inset:0;background:linear-gradient(150deg,#013a5e 0%,var(--blue) 60%,#017DC5 100%);z-index:1000;display:flex;align-items:center;justify-content:center;padding:20px}
+.login-overlay{position:fixed;inset:0;background:linear-gradient(150deg,#001B3D 0%,var(--navy) 55%,#013C7A 100%);z-index:1000;display:flex;align-items:center;justify-content:center;padding:20px}
 .login-card{background:#fff;border-radius:20px;padding:32px 24px;width:100%;max-width:380px;box-shadow:0 24px 80px rgba(0,0,0,.35)}
 .login-logo{width:60px;height:60px;background:var(--yellow);border-radius:14px;display:flex;align-items:center;justify-content:center;font:800 20px/1 var(--mono);color:var(--blue);margin:0 auto 16px;box-shadow:0 4px 12px rgba(255,220,2,.4)}
 .login-title{font-size:22px;font-weight:800;color:var(--text);text-align:center;margin-bottom:2px}
@@ -367,7 +367,7 @@ tr.hi-row td{background:rgba(255,220,2,.06)}
     <div class="vrow"><span class="vl">Signed in as</span><span class="vv info" id="s-loggedIn">—</span></div>
     <div class="vrow"><span class="vl">Total entries</span><span class="vv info" id="s-count">—</span></div>
     <div class="vrow"><span class="vl">Last entry</span><span class="vv" id="s-last">—</span></div>
-    <div class="vrow"><span class="vl">Version</span><span class="vv muted">2.1 · Jul 2026</span></div>
+    <div class="vrow"><span class="vl">Version</span><span class="vv muted">2.2 · Jul 2026</span></div>
   </div>
 </div>
 
@@ -1131,7 +1131,58 @@ function renderReconcile(){
 }
 // ── TAKEOVER RECONCILIATION (8-Apr-2026) — supersedes the May re-anchor ──
 var TAKEOVER_DATE='2026-04-08';
-var MAT_INFUSION_APRMAY=6896305; // ₹23,90,000 bank RTGS + ₹45,06,305 BPCL 347093/4 (Apr–May statements)
+// Takeover figures are DERIVED from the applied statement records (Reconcile → Parse → Apply),
+// not hardcoded. Only the customer advance is a fixed agreed figure. The LEGACY values (what the
+// card showed up to Jul-2026) are kept ONLY to flag differences — they are never written silently.
+var CUST_ADVANCE=150000; // agreed at takeover — the only fixed head
+// DIRECT infusion: MAT paid third parties on Dolly's behalf — these touch NEITHER Dolly's bank
+// account NOR the BPCL account, so no statement can show them. Items from the master ledger's
+// "Infused In Dolly" list, CONFIRMED by Aamir 3-Jul-2026 ("MAT paid Gul on Dolly's behalf").
+// NOTE (also confirmed 3-Jul): the ledger's 30-Apr ₹10,00,000 "Dolly NEFT" is the CORNEA hand-loan
+// return (1-May bank credit), NOT MAT infusion — deliberately NOT in this list; and the 9-Apr ₹7,800
+// (code 347093) IS MAT — it comes from the BPCL statement automatically.
+var DIRECT_INFUSION=[
+  {date:'2026-04-20', remark:'Gul NEFT', amt:561420},
+  {date:'2026-04-21', remark:'Gul NEFT', amt:467850},
+  {date:'2026-04-22', remark:'Gul NEFT', amt:561420},
+  {date:'2026-04-26', remark:'Gul NEFT', amt:561420},
+  {date:'2026-04-27', remark:'Gul NEFT', amt:467850}
+]; // = ₹26,19,960
+var LEGACY_TAKEOVER={matInfusion:9866265.22, cornea:400000, ccInterest:300000, bpclOpening:610890.91}; // matInfusion = bank 27,40,000 (incl. 30-May ₹3.5L IMPS, confirmed MAT 3-Jul) + BPCL 45,06,305.22 + Gul direct 26,19,960. The figure POSTED on live before this redesign was ₹68,96,305 (excluded the IMPS + Gul items).
+var TAKEOVER_MONTHS=['2026-04','2026-05'];
+function deriveTakeoverFigures(){
+  var rec=getReconStore().reconciliations||{};
+  var out={matBank:0, matBpcl:0, matDirect:0, ccInterest:0, corneaOut:0, corneaIn:0, bpclOpening:null, matRows:[], missing:[], warnings:[]};
+  TAKEOVER_MONTHS.forEach(function(m){
+    var r=rec[m]||{};
+    if(!r.bank){ out.missing.push('Bank (UBI) statement '+m); }
+    else{
+      out.matBank+=(r.bank.cat&&r.bank.cat.matIn)||0;
+      out.ccInterest+=(r.bank.cat&&r.bank.cat.ccInterest)||0;
+      if(r.bank.matRows) r.bank.matRows.forEach(function(x){ out.matRows.push(x); });
+      else out.warnings.push('Bank record '+m+' has no itemised MAT deposit rows (old format) — re-apply the statement to itemise.');
+      if(r.bank.cornea){ out.corneaOut+=r.bank.cornea.out||0; out.corneaIn+=r.bank.cornea['in']||0; }
+      else out.missing.push('Bank statement '+m+' re-applied (old record has no Cornea figure)');
+    }
+    if(!r.bpcl){ out.missing.push('BPCL statement '+m); }
+    else{
+      out.matBpcl+=(r.bpcl.cat&&r.bpcl.cat.matTransfer)||0;
+      if(m===TAKEOVER_MONTHS[0]&&r.bpcl.opening!=null) out.bpclOpening=r.bpcl.opening;
+    }
+  });
+  if(out.bpclOpening==null&&!out.missing.some(function(s){return /BPCL statement 2026-04$/.test(s);})) out.warnings.push('April BPCL record has no opening balance — re-apply the April BPCL statement.');
+  DIRECT_INFUSION.forEach(function(x){
+    var m=x.date.slice(0,7);
+    if(TAKEOVER_MONTHS.indexOf(m)>=0){ out.matDirect+=x.amt; out.matRows.push({date:x.date, part:x.remark+' — direct, not in bank/BPCL statements (confirmed 3-Jul)', amt:x.amt, direct:true}); }
+  });
+  out.matInfusion=Math.round((out.matBank+out.matBpcl+out.matDirect)*100)/100;
+  out.cornea=Math.round((out.corneaOut-out.corneaIn)*100)/100;
+  return out;
+}
+function takeoverDiffNote(derived,legacy,what){
+  if(Math.abs(derived-legacy)<=1) return '<span style="font-size:11px;color:#1e7d34">✓ matches previously used figure</span>';
+  return '<span style="font-size:11px;color:#b26a00">⚠ previously used '+inr(legacy)+' — differs by '+inr(Math.round(Math.abs(derived-legacy)))+'. Verify '+what+' before confirming.</span>';
+}
 function reanchorPanelHtml(){
   if(!hasPerm('reconcile')) return '';
   var nm='AAMIR TRANSPORT';
@@ -1149,7 +1200,7 @@ function reanchorPanelHtml(){
       '<div id="reanchorPanel" style="margin-top:10px"></div></div>';
   }
   return '<div class="card" style="border:1px dashed var(--blue)"><div class="card-title">📒 Set up takeover reconciliation (8-Apr-2026)</div>'+
-    '<p style="font-size:12px;color:var(--text2);margin:4px 0 8px">One-time: anchor Aamir to the 8-Apr takeover (opening 0), post the Apr–May MAT infusion from the statements, and create the opening heads (Cornea loan, customer advance, Kanyaka Nagri CC interest, BPCL opening).</p>'+
+    '<p style="font-size:12px;color:var(--text2);margin:4px 0 8px">One-time: anchor Aamir to the 8-Apr takeover (opening 0). The MAT infusion and opening heads (Cornea loan, Kanyaka Nagri CC interest, BPCL opening) are <b>derived from the applied Apr–May statement records</b> — upload and Apply those statements above first. Only the ₹1,50,000 customer advance is a fixed figure.</p>'+
     '<button class="btn btn-blue" onclick="previewTakeover()">Set up takeover reconciliation…</button><div id="reanchorPanel" style="margin-top:10px"></div></div>';
 }
 var pendingTakeover=null;
@@ -1160,48 +1211,78 @@ function previewTakeover(){
   var p=getParties().find(function(x){ return x.name===nm; });
   if(!p){ panel.innerHTML='<p style="color:#c62828">Aamir party not found.</p>'; return; }
   if(getReconStore().takeover){ panel.innerHTML='<p style="color:var(--text3)">Takeover reconciliation already set up.</p>'; return; }
+  var f=deriveTakeoverFigures();
+  if(f.missing.length){
+    panel.innerHTML='<div class="card" style="border:1px solid #b26a00"><div class="card-title" style="color:#b26a00">Statements needed first</div>'+
+      '<p style="font-size:12px;color:var(--text2)">The takeover figures are derived from applied statement records. Upload each statement above, press <b>Parse file</b>, then <b>Apply / Save reconciliation</b>. Still needed:</p>'+
+      f.missing.map(function(m){ return '<div class="vrow"><span class="vl">• '+escHtml(m)+'</span><span class="vv" style="color:#b26a00">missing</span></div>'; }).join('')+
+      '</div>';
+    return;
+  }
   var sum=function(a){ return a.reduce(function(s,x){ return s+(x.amount||0); },0); };
   var salesFrom=Math.round(sum(getPartySales(nm).filter(function(x){ return x.date>=TAKEOVER_DATE; })));
   var paysFrom=Math.round(sum(getPartyPayments(nm).filter(function(x){ return x.date>=TAKEOVER_DATE; })));
-  var projected=0+salesFrom-paysFrom-MAT_INFUSION_APRMAY;
-  pendingTakeover={salesFrom:salesFrom, paysFrom:paysFrom, mat:MAT_INFUSION_APRMAY, projected:projected};
-  var vr=function(l,v){ return '<div class="vrow"><span class="vl">'+l+'</span><span class="vv">'+v+'</span></div>'; };
-  panel.innerHTML='<div class="card" style="border:1px solid var(--blue)"><div class="card-title">Review takeover setup</div>'+
+  pendingTakeover={salesFrom:salesFrom, paysFrom:paysFrom, f:f};
+  var vr=function(l,v,n2){ return '<div class="vrow"><span class="vl">'+l+'</span><span class="vv">'+v+'</span></div>'+(n2?'<div style="padding-left:6px">'+n2+'</div>':''); };
+  var matList=f.matRows.map(function(r){ return '<div class="vrow" style="padding-left:6px"><span class="vl" style="font-size:12px"><label><input type="checkbox" class="tkMat" data-amt="'+(r.amt||0)+'" checked onchange="tkRecalc()"> <span style="color:var(--text3);font-size:10px">'+escHtml(String(r.date||''))+'</span> '+escHtml(String(r.part||'').slice(0,46))+'</label></span><span class="vv" style="font-size:12px">'+inr(r.amt||0)+'</span></div>'; }).join('');
+  panel.innerHTML='<div class="card" style="border:1px solid var(--blue)"><div class="card-title">Review takeover setup — derived from statements</div>'+
     vr('Ledger start (Aamir)', TAKEOVER_DATE)+
     vr('Opening balance', inr(0))+
     vr('Fuel purchases since 8-Apr', '+ '+inr(salesFrom))+
     vr('Existing payments/credits since 8-Apr', '− '+inr(paysFrom))+
-    vr('MAT infusion Apr–May (to post)', '− '+inr(MAT_INFUSION_APRMAY))+
-    '<div class="vrow" style="border-top:1px solid var(--border);margin-top:6px;padding-top:6px"><span class="vl" style="font-weight:700">Aamir balance (interim)</span><span class="vv">'+inr(projected)+' <span style="font-size:11px;color:var(--text3)">'+(projected<0?'Dolly owes Aamir':'owes Dolly')+'</span></span></div>'+
+    '<div style="font:700 12px var(--font);margin:10px 0 2px">MAT infusion — bank deposits + confirmed direct payments (untick any that are NOT capital infusion, e.g. fuel payments)</div>'+
+    matList+
+    '<div class="vrow"><span class="vl">BPCL 347093/4 transfers (from BPCL statements)</span><span class="vv">'+inr(Math.round(f.matBpcl))+'</span></div>'+
+    '<div class="vrow"><span class="vl" style="font-weight:700">MAT infusion Apr–May (to post)</span><span class="vv" style="font-weight:700" id="tkMatTotal">− '+inr(Math.round(f.matInfusion))+'</span></div>'+
+    '<div id="tkMatDiff" style="padding-left:6px">'+takeoverDiffNote(f.matInfusion,LEGACY_TAKEOVER.matInfusion,'each deposit really is capital infusion (not a fuel payment)')+'</div>'+
+    '<div class="vrow" style="border-top:1px solid var(--border);margin-top:6px;padding-top:6px"><span class="vl" style="font-weight:700">Aamir balance (interim)</span><span class="vv" id="tkProjected"></span></div>'+
     '<div style="font:700 12px var(--font);margin:10px 0 2px">Opening heads to create</div>'+
-    vr('Cornea Land Developers (receivable)', inr(400000))+
-    vr('Customer advance (liability)', inr(150000))+
-    vr('Kanyaka Nagri CC — interest paid', inr(300000))+
-    vr('BPCL opening balance', inr(610891))+
+    vr('Cornea Land Developers (receivable)', inr(f.cornea), takeoverDiffNote(f.cornea,LEGACY_TAKEOVER.cornea,'the Cornea transfer rows'))+
+    vr('Customer advance (liability — fixed figure)', inr(CUST_ADVANCE))+
+    vr('Kanyaka Nagri CC — interest paid', inr(f.ccInterest), takeoverDiffNote(f.ccInterest,LEGACY_TAKEOVER.ccInterest,'the NEFTO-DOLLY PETROLEUM rows'))+
+    vr('BPCL opening balance', inr(f.bpclOpening||0), takeoverDiffNote(f.bpclOpening||0,LEGACY_TAKEOVER.bpclOpening,'the BPCL statement opening'))+
+    (f.warnings.length?('<div style="font-size:11px;color:#b26a00;margin-top:6px">'+f.warnings.map(escHtml).join('<br>')+'</div>'):'')+
     '<div style="margin-top:12px;display:flex;gap:8px"><button class="btn btn-blue" style="width:auto;padding:10px 18px" onclick="commitTakeover()">Confirm &amp; Save</button><button class="btn btn-outline" style="width:auto;padding:10px 18px" onclick="document.getElementById(\'reanchorPanel\').innerHTML=\'\'">Cancel</button></div>'+
-    '<p style="font-size:11px;color:var(--text3);margin-top:8px">Aamir balance is interim until June MAT is posted (apply June statements next). Writes Aamir\'s ledger start + opening + the MAT financing payment, and the opening heads. Syncs to all devices; this setup runs once.</p></div>';
+    '<p style="font-size:11px;color:var(--text3);margin-top:8px">All figures above are read from the applied Apr–May statement records; only the customer advance is fixed. Aamir balance is interim until June MAT is posted (apply June statements next). Writes Aamir\'s ledger start + opening + the MAT financing payment, and the opening heads. Syncs to all devices; this setup runs once.</p></div>';
+  tkRecalc();
+}
+function tkChosenMat(){
+  var f=pendingTakeover&&pendingTakeover.f; if(!f) return 0;
+  var bank=0, boxes=document.querySelectorAll('.tkMat');
+  for(var i=0;i<boxes.length;i++){ if(boxes[i].checked) bank+=parseFloat(boxes[i].getAttribute('data-amt'))||0; }
+  if(!boxes.length) bank=f.matBank+f.matDirect; // no itemised rows rendered — fall back to the totals
+  return Math.round((bank+f.matBpcl)*100)/100;
+}
+function tkRecalc(){
+  if(!pendingTakeover) return;
+  var mat=tkChosenMat();
+  var el=document.getElementById('tkMatTotal'); if(el) el.textContent='− '+inr(Math.round(mat));
+  var dif=document.getElementById('tkMatDiff'); if(dif) dif.innerHTML=takeoverDiffNote(mat,LEGACY_TAKEOVER.matInfusion,'each deposit really is capital infusion (not a fuel payment)');
+  var projected=0+pendingTakeover.salesFrom-pendingTakeover.paysFrom-mat;
+  var pr=document.getElementById('tkProjected'); if(pr) pr.innerHTML=inr(Math.round(projected))+' <span style="font-size:11px;color:var(--text3)">'+(projected<0?'Dolly owes Aamir':'owes Dolly')+'</span>';
 }
 function commitTakeover(){
-  if(!pendingTakeover){ return; }
+  if(!pendingTakeover||!pendingTakeover.f){ return; }
   if(!hasPerm('reconcile')){ showToast('No permission'); return; }
   var nm='AAMIR TRANSPORT';
   var store=getReconStore();
   if(store.takeover){ showToast('Already set up'); pendingTakeover=null; return; }
   var parties=getParties(); var p=parties.find(function(x){ return x.name===nm; });
   if(!p){ showToast('Aamir not found'); return; }
+  var f=pendingTakeover.f, mat=tkChosenMat();
   p.openingBalance=0; p.ledgerStart=TAKEOVER_DATE; p.updatedAt=new Date().toISOString();
   saveParties(parties);
   var note='MAT infusion per statements (Apr–May 2026)';
   var pays=getPayments();
-  if(!pays.some(function(x){ return x.party===nm && x.note===note; })){ pays.push({party:nm, date:'2026-05-31', amount:MAT_INFUSION_APRMAY, note:note}); savePayments(pays); }
+  if(!pays.some(function(x){ return x.party===nm && x.note===note; })){ pays.push({party:nm, date:'2026-05-31', amount:mat, note:note}); savePayments(pays); }
   store.heads=store.heads||{};
   var by=(typeof currentDisplayName!=='undefined'&&currentDisplayName)||'unknown';
-  store.heads.matInfusion={label:'MAT infusion (Apr–May)', type:'Dolly owes Aamir', amount:MAT_INFUSION_APRMAY};
-  store.heads.cornea={label:'Cornea Land Developers', type:'receivable (sister concern)', amount:400000};
-  store.heads.custAdvance={label:'Customer advance', type:'liability', amount:150000};
-  store.heads.ccInterest={label:'Kanyaka Nagri CC — interest', type:'paid Apr–May', amount:300000};
-  store.heads.bpclOpening={label:'BPCL opening (8-Apr)', type:'asset', amount:610890.91};
-  store.takeover={date:TAKEOVER_DATE, matAprMay:MAT_INFUSION_APRMAY, appliedAt:new Date().toISOString(), by:by};
+  store.heads.matInfusion={label:'MAT infusion (Apr–May)', type:'Dolly owes Aamir', amount:mat, source:'statements'};
+  store.heads.cornea={label:'Cornea Land Developers', type:'receivable (sister concern)', amount:f.cornea, source:'statements'};
+  store.heads.custAdvance={label:'Customer advance', type:'liability', amount:CUST_ADVANCE, source:'fixed'};
+  store.heads.ccInterest={label:'Kanyaka Nagri CC — interest', type:'paid Apr–May', amount:f.ccInterest, source:'statements'};
+  store.heads.bpclOpening={label:'BPCL opening (Apr statement)', type:'asset', amount:(f.bpclOpening||0), source:'statements'};
+  store.takeover={date:TAKEOVER_DATE, matAprMay:mat, appliedAt:new Date().toISOString(), by:by, source:'derived-from-statements'};
   saveReconStore(store);
   showToast('✓ Takeover reconciliation set — Aamir '+inr(getPartyBalance(nm)));
   pendingTakeover=null;
@@ -1236,40 +1317,79 @@ function commitResetTakeover(){
   renderReconcile();
 }
 
-// ── FINALISE: pin each party to its final balance from the master ledger ("Accounts Dolly Final" → Statement Latest), keep 8-Apr epoch so July+ entries move it ──
-// Aamir = fuel ₹1,23,52,993 + cash-to-MAT ₹51,03,878 − infused ₹1,63,10,452 − ₹10L Taj = owes ₹1,46,419.
-// NOTE: cash-to-MAT here uses Aamir's cash-received LIST (₹51,03,878). The master ledger's cash line is ₹55,90,204 — a ₹4,86,326 difference to be resolved (Aamir's 1 last cash confirmation). If cash → ₹55,90,204, Aamir = ₹6,32,745.
-var RECON_TARGETS={'AAMIR TRANSPORT':146419,'ARVINDO':-52436,'VIKAS COAL':0,'VAIBHAV YERAWAR':0,'TAJ TRADERS':0,'SS TRANSPORT':0,'BALAJI TRANSPO':0};
-function previewFinalise(){
+// ── FINALISE: pin each party to its final reconciled balance, keep 8-Apr epoch so July+ entries move it ──
+// Aamir's target is COMPUTED: fuel + cash-to-MAT − MAT infusion (derived from the applied Apr–Jun
+// statement records) − ₹10L Taj transfer. Fuel, cash and the Taj transfer come from the master ledger
+// and the 2-Jul agreement — they do not appear in bank/BPCL statements, so they stay as named constants.
+// CASH FINAL (confirmed by Aamir 3-Jul-2026): ₹55,56,998 cash given from Dolly to the Chandrapur
+// office (→ MAT) between 9-Apr and 30-Jun-2026. Supersedes the earlier cash list ₹51,03,878 and
+// the master ledger's ₹55,90,204 line. With this, ALL reconciliation inputs are final.
+var AAMIR_FUEL=12352993, AAMIR_CASH_TO_MAT=5556998, TAJ_TRANSFER=1000000;
+var FINALISE_MONTHS=['2026-04','2026-05','2026-06'];
+var LEGACY_RECON_TARGETS={'AAMIR TRANSPORT':146419,'ARVINDO':-52436,'VIKAS COAL':0,'VAIBHAV YERAWAR':0,'TAJ TRADERS':0,'SS TRANSPORT':0,'BALAJI TRANSPO':0}; // as finalised 30-Jun-2026 (infusion ₹1,63,10,452)
+var OTHER_TARGETS={'ARVINDO':-52436,'VIKAS COAL':0,'VAIBHAV YERAWAR':0,'TAJ TRADERS':0,'SS TRANSPORT':0,'BALAJI TRANSPO':0}; // master-ledger figures, not statement-derivable
+function deriveInfusionTotal(){
+  var rec=getReconStore().reconciliations||{};
+  var out={total:0, missing:[]};
+  FINALISE_MONTHS.forEach(function(m){
+    var r=rec[m]||{};
+    if(r.bank) out.total+=(r.bank.cat&&r.bank.cat.matIn)||0; else out.missing.push('Bank '+m);
+    if(r.bpcl) out.total+=(r.bpcl.cat&&r.bpcl.cat.matTransfer)||0; else out.missing.push('BPCL '+m);
+  });
+  DIRECT_INFUSION.forEach(function(x){ if(FINALISE_MONTHS.indexOf(x.date.slice(0,7))>=0) out.total+=x.amt; });
+  out.total=Math.round(out.total*100)/100;
+  return out;
+}
+var pendingFinalise=null;
+function previewFinalise(useLegacy){
   var panel=document.getElementById('reanchorPanel'); if(!panel) return;
   if(!hasPerm('reconcile')){ showToast('No permission'); return; }
+  var inf=deriveInfusionTotal();
+  var targets, srcNote, warn='';
+  if(useLegacy||inf.missing.length){
+    targets=LEGACY_RECON_TARGETS;
+    srcNote='last verified figures (finalised 30-Jun-2026, infusion ₹1,63,10,452)';
+    if(!useLegacy) warn='<div style="color:#b26a00;font-size:12px;margin-bottom:6px">⚠ Cannot derive the MAT infusion from statements — missing: '+escHtml(inf.missing.join(', '))+'. Apply those statements (upload above) to derive, or continue below with the last verified figures.</div>';
+  } else {
+    var aamir=Math.round(AAMIR_FUEL+AAMIR_CASH_TO_MAT-inf.total-TAJ_TRANSFER);
+    targets={}; Object.keys(OTHER_TARGETS).forEach(function(k){ targets[k]=OTHER_TARGETS[k]; }); targets['AAMIR TRANSPORT']=aamir;
+    srcNote='derived: fuel '+inr(AAMIR_FUEL)+' + cash-to-MAT '+inr(AAMIR_CASH_TO_MAT)+' − MAT infusion per statements '+inr(inf.total)+' − Taj transfer '+inr(TAJ_TRANSFER);
+    var lg=LEGACY_RECON_TARGETS['AAMIR TRANSPORT'];
+    var altCash=5590204, alt=Math.round(AAMIR_FUEL+altCash-inf.total-TAJ_TRANSFER);
+    if(Math.abs(aamir-lg)>1)
+      warn='<div style="color:#b26a00;font-size:12px;margin-bottom:6px">⚠ Derived Aamir target '+inr(aamir)+' ('+(aamir<0?'Dolly owes Aamir':'owes Dolly')+') differs from the previously finalised '+inr(lg)+' by '+inr(Math.abs(aamir-lg))+'. This is EXPECTED: the MAT infusion was corrected and CONFIRMED by Aamir on 3-Jul at '+inr(inf.total)+' (the earlier figure missed the ₹3,50,000 IMPS and the ₹26,19,960 Gul NEFT direct items). Cash-to-office is now CONFIRMED at '+inr(AAMIR_CASH_TO_MAT)+' (9-Apr–30-Jun-2026) — all reconciliation inputs are final. <a href="#" onclick="previewFinalise(true);return false" style="color:var(--blue)">Use the previously finalised figures instead</a>.</div>';
+    else warn='<div style="color:#1e7d34;font-size:12px;margin-bottom:6px">✓ Derived target matches the previously finalised '+inr(lg)+'.</div>';
+  }
+  pendingFinalise={targets:targets, srcNote:srcNote};
   var vr=function(l,cur,tgt){ return '<div class="vrow"><span class="vl">'+escHtml(l)+'</span><span class="vv">'+inr(cur)+' → <b>'+inr(tgt)+'</b> <span style="font-size:11px;color:var(--text3)">'+(tgt>0?'owes Dolly':tgt<0?'in credit':'nil')+'</span></span></div>'; };
   var body='';
-  Object.keys(RECON_TARGETS).forEach(function(nm){ body+=vr(nm, Math.round(getPartyBalance(nm)), RECON_TARGETS[nm]); });
-  panel.innerHTML='<div class="card" style="border:1px solid var(--blue)"><div class="card-title">Finalise — set reconciled balances (as of 30-Jun-2026)</div>'+
-    body+
-    '<div style="font-size:11px;color:var(--text3);margin-top:8px">Sets each party to its FINAL balance from the master ledger (Accounts Dolly Final → Statement Latest), keeping the 8-Apr ledger start so July-onward entries move it from here. Aamir = ledger ₹16,32,745 owed − ₹10L Taj transfer = ₹6,32,745; Aurobindo Dolly-owes ₹52,436; others nil.</div>'+
+  Object.keys(targets).forEach(function(nm){ body+=vr(nm, Math.round(getPartyBalance(nm)), targets[nm]); });
+  panel.innerHTML='<div class="card" style="border:1px solid var(--blue)"><div class="card-title">Finalise — set reconciled balances</div>'+warn+body+
+    '<div style="font-size:11px;color:var(--text3);margin-top:8px">Aamir target: '+srcNote+'. Other parties come from the master ledger (Accounts Dolly Final → Statement Latest). Keeps the 8-Apr ledger start so July-onward entries move balances from here. Cash-to-office (to MAT) is CONFIRMED at '+inr(AAMIR_CASH_TO_MAT)+' (9-Apr–30-Jun-2026, per Aamir). All reconciliation inputs are now final.</div>'+
     '<div style="margin-top:12px;display:flex;gap:8px"><button class="btn btn-blue" style="width:auto;padding:10px 18px" onclick="commitFinalise()">Confirm &amp; write to ERP</button><button class="btn btn-outline" style="width:auto;padding:10px 18px" onclick="document.getElementById(\'reanchorPanel\').innerHTML=\'\'">Cancel</button></div></div>';
 }
 function commitFinalise(){
   if(!hasPerm('reconcile')){ showToast('No permission'); return; }
+  if(!pendingFinalise||!pendingFinalise.targets){ showToast('Preview first'); return; }
+  var T=pendingFinalise.targets;
   var parties=getParties();
-  Object.keys(RECON_TARGETS).forEach(function(nm){
+  Object.keys(T).forEach(function(nm){
     var p=parties.find(function(x){ return x.name===nm; }); if(!p) return;
     p.ledgerStart='2026-04-08';
     p.openingBalance=0; // temp to read computed activity
   });
   saveParties(parties); // so getPartyBalance uses opening 0
   parties=getParties();
-  Object.keys(RECON_TARGETS).forEach(function(nm){
+  Object.keys(T).forEach(function(nm){
     var p=parties.find(function(x){ return x.name===nm; }); if(!p) return;
     var computed=getPartyBalance(nm); // = salesFrom8Apr − paysFrom8Apr (opening 0)
-    p.openingBalance=Math.round((RECON_TARGETS[nm]-computed)*100)/100;
+    p.openingBalance=Math.round((T[nm]-computed)*100)/100;
     p.updatedAt=new Date().toISOString();
   });
   saveParties(parties);
-  var s=getReconStore(); s.finalised={at:new Date().toISOString(), by:(typeof currentDisplayName!=='undefined'&&currentDisplayName)||'unknown', targets:RECON_TARGETS, cashProvisional:true}; saveReconStore(s);
+  var s=getReconStore(); s.finalised={at:new Date().toISOString(), by:(typeof currentDisplayName!=='undefined'&&currentDisplayName)||'unknown', targets:T, source:pendingFinalise.srcNote, cashProvisional:true}; saveReconStore(s);
   showToast('✓ Reconciliation finalised — Aamir '+inr(getPartyBalance('AAMIR TRANSPORT')));
+  pendingFinalise=null;
   renderReconcile();
   if(typeof renderParties==='function') try{ renderParties(); }catch(e){}
 }
@@ -1304,9 +1424,13 @@ function parseBankXlsx(aoa){
     counts:{phonepe:0,card:0,matIn:0,bpclOut:0,charges:0,ccInterest:0,otherIn:0,otherOut:0},
     totalDep:0,totalWd:0};
   var ci={date:0,rem:2,wd:6,dep:7,bal:8}, hr=-1;
+  // Normalise a cell (Date object or text) to 'dd-mm-yyyy', else null
+  function pdate(v){ if(v instanceof Date) return ('0'+v.getUTCDate()).slice(-2)+'-'+('0'+(v.getUTCMonth()+1)).slice(-2)+'-'+v.getUTCFullYear(); var m=String(v==null?'':v).match(/(\d{1,2})[-\/](\d{1,2})[-\/](\d{4})/); return m?(('0'+m[1]).slice(-2)+'-'+('0'+m[2]).slice(-2)+'-'+m[3]):null; }
   for(var r=0;r<Math.min(aoa.length,30);r++){
     var low=(aoa[r]||[]).map(function(x){return String(x==null?'':x).toLowerCase();}); var joined=low.join(' ');
     if(!out.period){ var pm=joined.match(/from\s+(.+?\d{4})\s+to\s+(.+?\d{4})/); if(pm) out.period=(pm[1]+' → '+pm[2]).replace(/\s+/g,' ').trim(); }
+    // UBI Excel exports put the period in separate cells: 'Statement From' | <date> | 'To' | <date>
+    if(!out.period){ var cells=aoa[r]||[]; for(var c2=0;c2<cells.length;c2++){ if(/statement\s*from/i.test(String(cells[c2]==null?'':cells[c2]))){ var nxt=cells[c2+1], t3=(String(cells[c2+2]==null?'':cells[c2+2]).trim().toLowerCase()==='to')?cells[c2+3]:cells[c2+2]; var fv=pdate(nxt), tv=pdate(t3); if(fv&&tv) out.period=fv+' → '+tv; break; } } }
     if(/withdrawal/.test(joined)&&/deposit/.test(joined)){ hr=r; low.forEach(function(x,i){
       if(/date/.test(x)) ci.date=i; else if(/remark|particular|narrat/.test(x)) ci.rem=i; else if(/withdrawal|debit/.test(x)) ci.wd=i; else if(/deposit|credit/.test(x)) ci.dep=i; else if(/balance/.test(x)) ci.bal=i; }); break; }
   }
@@ -1333,6 +1457,8 @@ function parseBankXlsx(aoa){
     if(isdep) out.totalDep+=amt; else out.totalWd+=amt;
     out.rows.push({date:fmtd(row[ci.date]), part:rem, amt:amt, dep:isdep, kind:kind});
   }
+  // Last resort: derive the period from the first/last transaction dates
+  if(!out.period&&out.rows.length){ var f2=pdate(out.rows[0].date), t2=pdate(out.rows[out.rows.length-1].date); if(f2&&t2) out.period=f2+' → '+t2; }
   return out;
 }
 // Parse a BPCL statement in Excel (Document Narration + Dr/Cr) → same shape as parseBpclLines
@@ -1358,6 +1484,17 @@ function parseBpclXlsx(aoa){
     var amt=(dr!=null?dr:cr);
     out.cat[kind]+=amt; out.counts[kind]++;
     out.rows.push({date:fmtd(row[ci.date]), narr:narr, amount:amt, docType:(dr!=null?'Dr':'Cr'), kind:kind});
+  }
+  // BPCL Excel exports have no 'Period ...' text line — derive it from the transaction dates
+  // so reconMonthKey can file the record (format: 'd Mon yyyy - d Mon yyyy').
+  if(!out.period&&out.rows.length){
+    var MN=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'], ds=[];
+    out.rows.forEach(function(rw){ var m2=String(rw.date||'').match(/(\d{1,2})[-\/](\d{1,2})[-\/](\d{4})/); if(m2) ds.push({d:+m2[1],mo:+m2[2],y:+m2[3]}); });
+    if(ds.length){
+      ds.sort(function(a,b){ return (a.y*10000+a.mo*100+a.d)-(b.y*10000+b.mo*100+b.d); });
+      var a1=ds[0], b1=ds[ds.length-1];
+      out.period=a1.d+' '+(MN[a1.mo-1]||'?')+' '+a1.y+' - '+b1.d+' '+(MN[b1.mo-1]||'?')+' '+b1.y;
+    }
   }
   return out;
 }
@@ -1435,7 +1572,7 @@ function renderBpclResult(d){
   box.innerHTML=summary+table+applyBtn+'<div id="applyPanel" style="margin-top:12px"></div><p style="font-size:12px;color:var(--text3);margin-top:10px">Read-only until you press Apply. Applying stores a dated reconciliation record + the BPCL closing balance and cross-checks invoices against ERP purchases — it does <b>not</b> change any party ledger.</p>';
 }
 
-/* BUILD:bankparser-v12-partyfuel */
+/* BUILD:rpc-redesign-v13-cashfinal */
 // Parse a Union Bank of India "Statement of Account" PDF (deposit/withdrawal by balance movement)
 function parseBankLines(lines){
   var out={period:'', opening:null, closing:null, rows:[],
@@ -1529,6 +1666,13 @@ function previewApply(){
     var gapOk=Math.abs(gap)<Math.max(2000,erpDig*0.02);
     flags.push({name:'Digital collections vs ERP', status:gapOk?'OK':'MISMATCH', detail:'Bank PhonePe+card '+inr(digital)+' vs ERP UPI+swipe '+inr(erpDig)+' (gap '+inr(gap)+')'});
     record={source:'bank', period:d.period, opening:d.opening, closing:d.closing, totalDep:d.totalDep, totalWd:d.totalWd, cat:d.cat, counts:d.counts, erpDigital:erpDig, digitalGap:gap};
+    // Itemise MAT deposits + Cornea transfers so the takeover reconciliation can derive its figures from this record
+    record.matRows=(d.rows||[]).filter(function(r){ return r.kind==='matIn'; }).map(function(r){ return {date:r.date, part:String(r.part||'').slice(0,60), amt:r.amt}; });
+    var cOut=0,cIn=0; (d.rows||[]).forEach(function(r){ if(/CORNEA/i.test(r.part||'')){ if(r.dep) cIn+=r.amt; else cOut+=r.amt; } });
+    record.cornea={out:Math.round(cOut*100)/100, 'in':Math.round(cIn*100)/100};
+    var rowMonths={}; (d.rows||[]).forEach(function(r){ var m2=String(r.date||'').match(/(\d{1,2})[-\/](\d{1,2})[-\/](\d{4})/); if(m2) rowMonths[m2[3]+'-'+('0'+m2[2]).slice(-2)]=1; });
+    var mk=Object.keys(rowMonths).sort();
+    if(mk.length&&(mk.length>1||mk[0]!==ym)) flags.push({name:'Statement month check', status:'MISMATCH', detail:'Transaction rows span '+mk.join(', ')+' but this record will be filed under '+ym+' — use one statement per month.'});
     body = vr('Month', ym)
       + vr('Deposits / withdrawals', inr(d.totalDep)+' / '+inr(d.totalWd))
       + vr('Closing balance', inr(d.closing||0))
@@ -1562,7 +1706,8 @@ function commitApply(){
   var s=getReconStore();
   s.reconciliations[pendingApply.ym]=s.reconciliations[pendingApply.ym]||{};
   s.reconciliations[pendingApply.ym][pendingApply.type]=pendingApply.record;
-  if(pendingApply.bpclBalance) s.bpclBalance=pendingApply.bpclBalance;
+  // Only move the tracked BPCL balance FORWARD — applying an older month must not regress it
+  if(pendingApply.bpclBalance){ var curB=s.bpclBalance; if(!curB||!curB.month||!pendingApply.bpclBalance.month||pendingApply.bpclBalance.month>=curB.month) s.bpclBalance=pendingApply.bpclBalance; }
   saveReconStore(s);
   showToast('✓ '+pendingApply.type.toUpperCase()+' reconciliation saved for '+pendingApply.ym);
   pendingApply=null;
