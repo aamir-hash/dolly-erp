@@ -250,7 +250,7 @@ tr.hi-row td{background:rgba(255,220,2,.06)}
   <button class="sbn" onclick="nav(4)" id="sbn4" data-tab="4"><span class="sb-ic">🕐</span>History</button>
   <div class="sb-group">System</div>
   <button class="sbn" onclick="nav(5)" id="sbn5" data-tab="5"><span class="sb-ic">⚙️</span>Settings</button>
-  <div class="sb-foot">Operations ERP · v2.5</div>
+  <div class="sb-foot">Operations ERP · v2.6</div>
 </div>
 
 <div class="bnav">
@@ -395,7 +395,7 @@ tr.hi-row td{background:rgba(255,220,2,.06)}
     <div class="vrow"><span class="vl">Signed in as</span><span class="vv info" id="s-loggedIn">—</span></div>
     <div class="vrow"><span class="vl">Total entries</span><span class="vv info" id="s-count">—</span></div>
     <div class="vrow"><span class="vl">Last entry</span><span class="vv" id="s-last">—</span></div>
-    <div class="vrow"><span class="vl">Version</span><span class="vv muted">2.5 · Jul 2026</span></div>
+    <div class="vrow"><span class="vl">Version</span><span class="vv muted">2.6 · Jul 2026</span></div>
   </div>
 </div>
 
@@ -632,6 +632,21 @@ function renderStepBar(){
 }
 function goStep(i){ curStep=i; renderEntry(); window.scrollTo(0,0); }
 
+function entryDateBounds(){
+  var today=todayStr();
+  // Operators: only the current running month. Admins: full FY 2026-27 (for corrections). No future dates for anyone.
+  var min=(typeof isAdmin==='function'&&isAdmin()) ? '2026-04-01' : today.slice(0,7)+'-01';
+  return {min:min, max:today};
+}
+function validateEntryDate(d){
+  var b=entryDateBounds(), adm=(typeof isAdmin==='function'&&isAdmin());
+  if(!d) return {ok:false,msg:'Date is required.'};
+  var dt=parseLocal(d);
+  if(isNaN(dt.getTime())||localISO(dt)!==d) return {ok:false,msg:'Enter a valid calendar date.'};
+  if(d>b.max) return {ok:false,msg:'Future dates are not allowed.'};
+  if(d<b.min) return {ok:false,msg:adm?'Date is outside FY 2026-27 (starts 01-Apr-2026).':'You can only enter dates in the current month. Ask an admin for earlier corrections.'};
+  return {ok:true};
+}
 function stepDate(){
   var today = todayStr();
   var existing = entries.find(function(e){ return e.date===today&&e.submitted; });
@@ -639,15 +654,19 @@ function stepDate(){
   if(!draft.reporter) draft.reporter='';
   return '<div class="card"><div class="card-title">📅 Step 1 — Date & Reporter</div>'+
     '<div class="alert alert-b" style="font-size:11px;margin-bottom:10px">Morning: enter the 10 AM opening nozzle readings + morning stock, then <b>Save morning</b>. Come back in the evening to finish (closing readings, 10 PM stock, collections, expenses).</div>'+
-    '<div class="field"><label>Date</label><input type="date" id="e-date" value="'+draft.date+'" max="'+today+'"/></div>'+
+    '<div class="field"><label>Date</label><input type="date" id="e-date" value="'+draft.date+'" min="'+entryDateBounds().min+'" max="'+today+'"/></div>'+
     '<div class="field"><label>Reported by</label><select id="e-reporter">'+
       ['Shiban','Ganesh','Manager','Mustafa Bhai','Other'].map(function(n){ return '<option'+(draft.reporter===n?' selected':'')+'>'+n+'</option>'; }).join('')+
     '</select></div></div>'+
-    '<button class="btn btn-blue" onclick="saveDraft0();goStep(1)">Next — Opening Readings (10 AM) →</button>';
+    '<button class="btn btn-blue" onclick="if(saveDraft0())goStep(1)">Next — Opening Readings (10 AM) →</button>';
 }
 function saveDraft0(){
-  draft.date=document.getElementById('e-date').value;
+  var d=document.getElementById('e-date').value;
+  var v=validateEntryDate(d);
+  if(!v.ok){ showToast('⚠ '+v.msg); return false; }
+  draft.date=d;
   draft.reporter=document.getElementById('e-reporter').value;
+  return true;
 }
 
 // STEP 2 — Opening nozzle readings (10 AM), stored as p1o..p4o / d1o..d4o
@@ -700,7 +719,7 @@ function saveClosing(){
   ['pTest','dTest'].forEach(function(k){ var el=document.getElementById('e-'+k); if(el){ var v=parseFloat(el.value); draft[k]=isNaN(v)?0:v; } });
 }
 
-function stockInput(id,label,val){ return '<div class="field"><label>'+label+'</label><input type="number" id="e-'+id+'" step="0.01" value="'+(val!==undefined&&val!==null&&val!==''?val:'')+'" placeholder="0"/></div>'; }
+function stockInput(id,label,val){ return '<div class="field"><label>'+label+'</label><input type="number" min="0" id="e-'+id+'" step="0.01" value="'+(val!==undefined&&val!==null&&val!==''?val:'')+'" placeholder="0"/></div>'; }
 // STEP 3 — Morning stock (10 AM) + the "Save morning, finish later" action
 function stepMorningStock(){
   return '<div class="card"><div class="card-title">☀️ Step 3 — Morning Stock (10 AM)</div>'+
@@ -750,7 +769,7 @@ function updateSFAlerts(){
   if(el) el.innerHTML=shortfallAlertHTML(checks);
 }
 function stepCollections(){
-  function ci(id,label,val){ return '<div class="field"><label>'+label+'</label><input type="number" id="e-'+id+'" step="0.01" value="'+(val==null||isNaN(val)?'':val)+'" placeholder="0"/></div>'; }
+  function ci(id,label,val){ return '<div class="field"><label>'+label+'</label><input type="number" min="0" id="e-'+id+'" step="0.01" value="'+(val==null||isNaN(val)?'':val)+'" placeholder="0"/></div>'; }
   var _parties=getParties(); var _fl=draft.fleetLitresBreakdown||{}; var _fr=draft.fleetRateBreakdown||{};
   var _fleetRows=_parties.map(function(p,i){
     var lv=_fl[p.name]; var isA=(p.name==='AAMIR TRANSPORT');
@@ -781,7 +800,7 @@ function stepCollections(){
     '</div></div>'+
     '<div class="card"><div class="card-title">💵 Cash sent to Chandrapur office</div>'+
     '<div class="alert alert-b" style="font-size:11px;margin-bottom:10px">Cash physically carried to the office today. Should equal cash collected − cash expenses. The monthly Cash Match tab flags any gap.</div>'+
-    '<div class="field"><label>Cash sent to office (₹)</label><input type="number" id="e-cashToOffice" step="0.01" value="'+(draft.cashToOffice!=null&&draft.cashToOffice!==''?draft.cashToOffice:'')+'" placeholder="0"/></div></div>'+
+    '<div class="field"><label>Cash sent to office (₹)</label><input type="number" min="0" id="e-cashToOffice" step="0.01" value="'+(draft.cashToOffice!=null&&draft.cashToOffice!==''?draft.cashToOffice:'')+'" placeholder="0"/></div></div>'+
     '<div class="card"><div class="card-title">🚛 Credit Sales by Party</div>'+
     '<div class="alert alert-b" style="font-size:11px;margin-bottom:10px">Enter diesel <b>litres</b> given on credit to each party. Aamir Transport is billed at <b>cost</b> automatically; for the others enter the <b>rate ₹/L</b> (defaults to their usual rate — change it if today\'s credit rate is different). Leave blank if none.</div>'+
     _fleetRows+
@@ -916,10 +935,20 @@ function stepReview(){
 }
 
 function submitEntry(){
+  // Validation guards: date window, negative values, duplicate date.
+  var dv=validateEntryDate(draft.date);
+  if(!dv.ok){ showToast('⚠ '+dv.msg); nav(0); return; }
+  var neg=false;
+  Object.keys(draft).forEach(function(k){ if(k==='date'||k==='reporter'||k==='type'||k==='expenses') return; var val=draft[k]; if(val===''||val==null||typeof val==='boolean') return; if(!isNaN(val)&&Number(val)<0) neg=true; });
+  if(Array.isArray(draft.expenses)) draft.expenses.forEach(function(x){ if(Number(x.amount)<0) neg=true; });
+  if(neg){ showToast('⚠ Negative values are not allowed.'); return; }
+  var dup=entries.find(function(x){ return x.date===draft.date && x.submitted; });
+  if(dup && !entryEditOverride){ if(!confirm('An entry for '+fmtDate(draft.date)+' already exists. Overwrite it?')) return; }
   var e=JSON.parse(JSON.stringify(draft));
   e.type='daily'; e.submitted=true;
   e.savedAt=new Date().toISOString();
   computeEntry(e);
+  if(e.totalColl>10000000 || e.dSold>50000 || e.pSold>50000){ if(!confirm('These values look unusually large — collections '+inr(e.totalColl)+', HSD '+Math.round(e.dSold)+' L, MS '+Math.round(e.pSold)+' L. Submit anyway?')) return; }
   // Remove existing entry for same date
   entries = entries.filter(function(x){ return x.date!==e.date; });
   entries.push(e);
@@ -1607,7 +1636,7 @@ function renderBpclResult(d){
   box.innerHTML=summary+table+applyBtn+'<div id="applyPanel" style="margin-top:12px"></div><p style="font-size:12px;color:var(--text3);margin-top:10px">Read-only until you press Apply. Applying stores a dated reconciliation record + the BPCL closing balance and cross-checks invoices against ERP purchases — it does <b>not</b> change any party ledger.</p>';
 }
 
-/* BUILD:rpc-redesign-v16-antispiral */
+/* BUILD:rpc-redesign-v17-entryvalidation */
 // Parse a Union Bank of India "Statement of Account" PDF (deposit/withdrawal by balance movement)
 function parseBankLines(lines){
   var out={period:'', opening:null, closing:null, rows:[],
