@@ -250,7 +250,7 @@ tr.hi-row td{background:rgba(255,220,2,.06)}
   <button class="sbn" onclick="nav(4)" id="sbn4" data-tab="4"><span class="sb-ic">🕐</span>History</button>
   <div class="sb-group">System</div>
   <button class="sbn" onclick="nav(5)" id="sbn5" data-tab="5"><span class="sb-ic">⚙️</span>Settings</button>
-  <div class="sb-foot">Operations ERP · v2.4</div>
+  <div class="sb-foot">Operations ERP · v2.5</div>
 </div>
 
 <div class="bnav">
@@ -395,7 +395,7 @@ tr.hi-row td{background:rgba(255,220,2,.06)}
     <div class="vrow"><span class="vl">Signed in as</span><span class="vv info" id="s-loggedIn">—</span></div>
     <div class="vrow"><span class="vl">Total entries</span><span class="vv info" id="s-count">—</span></div>
     <div class="vrow"><span class="vl">Last entry</span><span class="vv" id="s-last">—</span></div>
-    <div class="vrow"><span class="vl">Version</span><span class="vv muted">2.4 · Jul 2026</span></div>
+    <div class="vrow"><span class="vl">Version</span><span class="vv muted">2.5 · Jul 2026</span></div>
   </div>
 </div>
 
@@ -1306,7 +1306,9 @@ function commitTakeover(){
   saveParties(parties);
   var note='MAT infusion per statements (Apr–May 2026)';
   var pays=getPayments();
-  if(!pays.some(function(x){ return x.party===nm && x.note===note; })){ pays.push({party:nm, date:'2026-05-31', amount:mat, note:note}); savePayments(pays); }
+  // Remove any existing MAT rows (old amounts) before posting, so they can't coexist/stack.
+  pays=pays.filter(function(x){ return !(x.party===nm && /MAT infusion|MAT bank deposits/i.test(x.note||'')); });
+  pays.push({party:nm, date:'2026-05-31', amount:mat, note:note}); savePayments(pays);
   store.heads=store.heads||{};
   var by=(typeof currentDisplayName!=='undefined'&&currentDisplayName)||'unknown';
   store.heads.matInfusion={label:'MAT infusion (Apr–May)', type:'Dolly owes Aamir', amount:mat, source:'statements'};
@@ -1605,7 +1607,7 @@ function renderBpclResult(d){
   box.innerHTML=summary+table+applyBtn+'<div id="applyPanel" style="margin-top:12px"></div><p style="font-size:12px;color:var(--text3);margin-top:10px">Read-only until you press Apply. Applying stores a dated reconciliation record + the BPCL closing balance and cross-checks invoices against ERP purchases — it does <b>not</b> change any party ledger.</p>';
 }
 
-/* BUILD:rpc-redesign-v15-tidyup */
+/* BUILD:rpc-redesign-v16-antispiral */
 // Parse a Union Bank of India "Statement of Account" PDF (deposit/withdrawal by balance movement)
 function parseBankLines(lines){
   var out={period:'', opening:null, closing:null, rows:[],
@@ -2694,7 +2696,7 @@ var spSync = {
       // from resurrecting old reconciliation rows and re-spiralling party balances. Balances
       // are pinned via each party's openingBalance (parties merge above), not stacked rows.
       if(data.payments){ try{
-        var RECON=/Daily ledger sync|Bank reconciliation|Advance deposit|Ledger reconciliation|Ledger\/Bank|Credit transfer/i;
+        var RECON=/Daily ledger sync|Bank reconciliation|Advance deposit|Ledger reconciliation|Ledger\/Bank|Credit transfer|MAT infusion|MAT bank deposits/i;
         var lpay=getPayments();
         var pkey=function(p){ return p.party+'|'+p.date+'|'+p.amount+'|'+(p.note||''); };
         var fileSeen={};
