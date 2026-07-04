@@ -250,7 +250,7 @@ tr.hi-row td{background:rgba(255,220,2,.06)}
   <button class="sbn" onclick="nav(4)" id="sbn4" data-tab="4"><span class="sb-ic">🕐</span>History</button>
   <div class="sb-group">System</div>
   <button class="sbn" onclick="nav(5)" id="sbn5" data-tab="5"><span class="sb-ic">⚙️</span>Settings</button>
-  <div class="sb-foot">Operations ERP · v2.7</div>
+  <div class="sb-foot">Operations ERP · v2.8</div>
 </div>
 
 <div class="bnav">
@@ -395,7 +395,7 @@ tr.hi-row td{background:rgba(255,220,2,.06)}
     <div class="vrow"><span class="vl">Signed in as</span><span class="vv info" id="s-loggedIn">—</span></div>
     <div class="vrow"><span class="vl">Total entries</span><span class="vv info" id="s-count">—</span></div>
     <div class="vrow"><span class="vl">Last entry</span><span class="vv" id="s-last">—</span></div>
-    <div class="vrow"><span class="vl">Version</span><span class="vv muted">2.7 · Jul 2026</span></div>
+    <div class="vrow"><span class="vl">Version</span><span class="vv muted">2.8 · Jul 2026</span></div>
   </div>
 </div>
 
@@ -686,6 +686,17 @@ function scoreCardHtml(e){
     '<div class="badge '+(st.cls==='ok'?'bg':st.cls==='amber'?'ba':'br')+'" style="font-size:12px;padding:4px 10px">'+st.emoji+' '+st.label+'</div></div>'+
     '<div style="height:8px;border-radius:4px;background:var(--border);overflow:hidden;margin-bottom:10px"><div style="height:100%;width:'+pct+'%;background:'+col+'"></div></div>'+
     '<details><summary style="font-size:12px;color:var(--blue);cursor:pointer">Show checklist</summary><div style="margin-top:6px">'+rows+'</div></details></div>';
+}
+function auditLogHtml(e){
+  if(!e || !e.editLog || !e.editLog.length) return '';
+  var rows=e.editLog.slice().reverse().map(function(l){
+    var ch=(l.changes&&l.changes.length)?l.changes.map(function(c){ return escHtml(c.field)+': '+inr(c.from||0)+' → '+inr(c.to||0); }).join(' · '):'';
+    return '<div style="font-size:11px;padding:7px 0;border-top:1px solid var(--border)">'+
+      '<div style="color:var(--text2)"><b>'+escHtml(l.by||'—')+'</b> · '+new Date(l.at).toLocaleString('en-IN')+(l.via?' · '+escHtml(l.via):'')+'</div>'+
+      '<div style="color:var(--text)">Reason: '+escHtml(l.reason||'—')+'</div>'+
+      (ch?'<div style="color:var(--text3);font-family:var(--mono)">'+ch+'</div>':'')+'</div>';
+  }).join('');
+  return '<div class="card"><div class="card-title">📝 Edit history ('+e.editLog.length+')</div>'+rows+'</div>';
 }
 
 function entryDateBounds(){
@@ -1001,9 +1012,14 @@ function submitEntry(){
   if(Array.isArray(draft.expenses)) draft.expenses.forEach(function(x){ if(Number(x.amount)<0) neg=true; });
   if(neg){ showToast('⚠ Negative values are not allowed.'); return; }
   var dup=entries.find(function(x){ return x.date===draft.date && x.submitted; });
-  if(dup && !entryEditOverride){ if(!confirm('An entry for '+fmtDate(draft.date)+' already exists. Overwrite it?')) return; }
+  var _editReason=null;
+  if(dup){
+    _editReason=prompt('An entry for '+fmtDate(draft.date)+' already exists. Enter a reason to overwrite it (required):','');
+    if(_editReason===null || _editReason.trim()===''){ showToast('Cancelled — a reason is required to overwrite'); return; }
+  }
   var e=JSON.parse(JSON.stringify(draft));
   e.type='daily'; e.submitted=true;
+  if(dup){ e.editLog=(dup.editLog||[]).concat([{at:new Date().toISOString(), by:(typeof currentDisplayName!=='undefined'&&currentDisplayName)||'unknown', reason:_editReason.trim(), via:'entry wizard'}]); }
   e.savedAt=new Date().toISOString();
   computeEntry(e);
   if(e.totalColl>10000000 || e.dSold>50000 || e.pSold>50000){ if(!confirm('These values look unusually large — collections '+inr(e.totalColl)+', HSD '+Math.round(e.dSold)+' L, MS '+Math.round(e.pSold)+' L. Submit anyway?')) return; }
@@ -1706,7 +1722,7 @@ function renderBpclResult(d){
   box.innerHTML=summary+table+applyBtn+'<div id="applyPanel" style="margin-top:12px"></div><p style="font-size:12px;color:var(--text3);margin-top:10px">Read-only until you press Apply. Applying stores a dated reconciliation record + the BPCL closing balance and cross-checks invoices against ERP purchases — it does <b>not</b> change any party ledger.</p>';
 }
 
-/* BUILD:rpc-redesign-v18-dataquality-p1 */
+/* BUILD:rpc-redesign-v19-audit-p2 */
 // Parse a Union Bank of India "Statement of Account" PDF (deposit/withdrawal by balance movement)
 function parseBankLines(lines){
   var out={period:'', opening:null, closing:null, rows:[],
@@ -2300,6 +2316,7 @@ function showDetail(date){
     '<div class="modal-title">'+fmtDate(e.date)+' · '+fmtDay(e.date)+'</div>'+
     '<button onclick="closeModal()" style="background:var(--border);border:none;border-radius:8px;padding:6px 12px;cursor:pointer;font-size:13px">✕ Close</button></div>'+
     dayDetailHTML(e)+
+    auditLogHtml(e)+
     (canEdit()?
       ('<div style="display:flex;gap:8px;margin-top:12px">'+
        '<button class="btn btn-outline" style="flex:1" onclick="openEditEntry(\''+e.date+'\')">✏️ Edit values</button>'+
@@ -2368,18 +2385,30 @@ function saveEditEntry(date){
   var e=entries.find(function(x){ return x.date===date; }); if(!e) return;
   readEditExps();
   function g(id){ var el=document.getElementById('ed-'+id); var v=el?parseFloat(el.value):NaN; return isNaN(v)?0:v; }
-  e.dSold=g('dSold'); e.dSell=g('dSell'); e.dCost=g('dCost'); e.dBuy=e.dCost;
-  e.pSold=g('pSold'); e.pSell=g('pSell'); e.pCost=g('pCost'); e.pBuy=e.pCost;
-  e.cash=g('cash'); e.upi=g('upi'); e.swipe=g('swipe'); e.fleet=g('fleet');
-  e.expenses=(draft.expenses||[]).filter(function(x){ return x.name&&x.amount; });
-  // recompute derived totals (no nozzle baseline — safe for imported entries)
+  var nv={dSold:g('dSold'),dSell:g('dSell'),dCost:g('dCost'),pSold:g('pSold'),pSell:g('pSell'),pCost:g('pCost'),cash:g('cash'),upi:g('upi'),swipe:g('swipe'),fleet:g('fleet')};
+  if(Object.keys(nv).some(function(k){ return nv[k]<0; })){ showToast('⚠ Negative values are not allowed.'); return; }
+  var newExp=(draft.expenses||[]).filter(function(x){ return x.name&&x.amount; });
+  var newExpTot=newExp.reduce(function(s,x){ return s+(+x.amount||0); },0);
+  // Diff against the current stored values to build the audit trail.
+  var changes=[];
+  Object.keys(nv).forEach(function(k){ if(Number(e[k]||0)!==Number(nv[k])) changes.push({field:k, from:e[k]||0, to:nv[k]}); });
+  var oldExpTot=(e.expenses||[]).reduce(function(s,x){ return s+(+x.amount||0); },0);
+  if(Number(oldExpTot)!==Number(newExpTot)) changes.push({field:'expenses total', from:oldExpTot, to:newExpTot});
+  if(!changes.length){ showToast('No changes to save'); return; }
+  var reason=prompt('You are correcting a submitted entry ('+fmtDate(date)+'). Enter a reason (required):','');
+  if(reason===null || reason.trim()===''){ showToast('Edit cancelled — a reason is required'); return; }
+  e.dSold=nv.dSold; e.dSell=nv.dSell; e.dCost=nv.dCost; e.dBuy=nv.dCost;
+  e.pSold=nv.pSold; e.pSell=nv.pSell; e.pCost=nv.pCost; e.pBuy=nv.pCost;
+  e.cash=nv.cash; e.upi=nv.upi; e.swipe=nv.swipe; e.fleet=nv.fleet;
+  e.expenses=newExp;
   e.dRev=e.dSold*e.dSell; e.pRev=e.pSold*e.pSell; e.totalRev=e.dRev+e.pRev;
   e.dMargin=e.dSold*(e.dSell-e.dCost); e.pMargin=e.pSold*(e.pSell-e.pCost); e.totalMargin=e.dMargin+e.pMargin;
   e.totalColl=(e.cash||0)+(e.upi||0)+(e.swipe||0)+(e.fleet||0);
   e.cashVar=e.totalColl-e.totalRev;
-  e.totalExp=e.expenses.reduce(function(s,x){ return s+(x.amount||0); },0);
+  e.totalExp=newExpTot;
   e.netProfit=e.totalMargin-e.totalExp;
   e.savedAt=new Date().toISOString();
+  e.editLog=(e.editLog||[]).concat([{at:new Date().toISOString(), by:(typeof currentDisplayName!=='undefined'&&currentDisplayName)||'unknown', reason:reason.trim(), changes:changes, via:'value editor'}]);
   try{ e.reportText=reportText(date); }catch(err){}
   try{ e.reportHtml=reportHtml(date); }catch(err){}
   try{ var _dl=getDeleted(); if(_dl.indexOf(date)>=0){ saveDeleted(_dl.filter(function(x){ return x!==date; })); } }catch(err){}
