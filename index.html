@@ -250,7 +250,7 @@ tr.hi-row td{background:rgba(255,220,2,.06)}
   <button class="sbn" onclick="nav(4)" id="sbn4" data-tab="4"><span class="sb-ic">🕐</span>History</button>
   <div class="sb-group">System</div>
   <button class="sbn" onclick="nav(5)" id="sbn5" data-tab="5"><span class="sb-ic">⚙️</span>Settings</button>
-  <div class="sb-foot">Operations ERP · v2.6</div>
+  <div class="sb-foot">Operations ERP · v2.7</div>
 </div>
 
 <div class="bnav">
@@ -264,7 +264,7 @@ tr.hi-row td{background:rgba(255,220,2,.06)}
 <!-- ═══════════════════════════════════════════ PAGE 0: ENTRY ═══ -->
 <div class="page active" id="page0">
   <div class="step-bar" id="stepBar"></div>
-  <div id="entryContent"></div>
+  <div id="entryContent" oninput="entryDirty=true"></div>
 </div>
 
 <!-- ═══════════════════════════════════════════ PAGE 1: TODAY ════ -->
@@ -395,7 +395,7 @@ tr.hi-row td{background:rgba(255,220,2,.06)}
     <div class="vrow"><span class="vl">Signed in as</span><span class="vv info" id="s-loggedIn">—</span></div>
     <div class="vrow"><span class="vl">Total entries</span><span class="vv info" id="s-count">—</span></div>
     <div class="vrow"><span class="vl">Last entry</span><span class="vv" id="s-last">—</span></div>
-    <div class="vrow"><span class="vl">Version</span><span class="vv muted">2.6 · Jul 2026</span></div>
+    <div class="vrow"><span class="vl">Version</span><span class="vv muted">2.7 · Jul 2026</span></div>
   </div>
 </div>
 
@@ -607,6 +607,11 @@ function initEntry(){
   var prog=entries.find(function(e){ return e.date===today && !e.submitted && e.morningSaved; });
   if(prog && draft.date!==today){ draft=JSON.parse(JSON.stringify(prog)); curStep=3; }        // resume at evening
   else if(draft.date!==today){ draft={date:today,reporter:'',expenses:[]}; curStep=0; }         // fresh morning
+  if(!sub){ try{ var ad=JSON.parse(localStorage.getItem(AUTOSAVE_KEY)||'null');
+    if(ad && ad.date===today && ad.draft && Object.keys(ad.draft).length>3 && curStep===0){
+      if(confirm('Found an unsaved entry for today (auto-saved '+new Date(ad.at).toLocaleTimeString('en-IN')+'). Restore it?')){ draft=ad.draft; curStep=(draft.morningSaved?3:1); }
+      else { clearAutodraft(); }
+    } }catch(e){} }
   renderEntry();
 }
 function renderLockedEntry(e){
@@ -631,6 +636,57 @@ function renderStepBar(){
   }).join('');
 }
 function goStep(i){ curStep=i; renderEntry(); window.scrollTo(0,0); }
+
+// ── Phase-1 data-quality helpers ──────────────────────────────
+var entryDirty=false;
+window.addEventListener('beforeunload', function(ev){ if(entryDirty){ ev.preventDefault(); ev.returnValue='You have an unsaved entry. Leave anyway?'; return ev.returnValue; } });
+var AUTOSAVE_KEY='dp_autodraft_v1';
+function autosaveDraft(){ try{ if(curPage===0 && draft && draft.date && !draft.submitted && curStep>0){ localStorage.setItem(AUTOSAVE_KEY, JSON.stringify({at:Date.now(), date:draft.date, draft:draft})); } }catch(e){} }
+setInterval(autosaveDraft, 30000);
+function clearAutodraft(){ try{ localStorage.removeItem(AUTOSAVE_KEY); }catch(e){} entryDirty=false; }
+function _has(v){ return v!=null && v!==''; }
+function entryHasNegative(d){
+  var neg=false;
+  Object.keys(d||{}).forEach(function(k){ if(k==='date'||k==='reporter'||k==='type'||k==='expenses') return; var v=d[k]; if(v===''||v==null||typeof v==='boolean') return; if(!isNaN(v)&&Number(v)<0) neg=true; });
+  if(Array.isArray(d.expenses)) d.expenses.forEach(function(x){ if(Number(x.amount)<0) neg=true; });
+  return neg;
+}
+function entryChecklist(e){
+  return [
+    ['Valid date', validateEntryDate(e.date).ok],
+    ['Reporter selected', !!e.reporter],
+    ['Opening MS nozzles', _has(e.p3o)||_has(e.p4o)],
+    ['Opening HSD nozzles', _has(e.d1o)||_has(e.d2o)||_has(e.d3o)||_has(e.d4o)],
+    ['Closing MS nozzles', _has(e.p3c)||_has(e.p4c)],
+    ['Closing HSD nozzles', _has(e.d1c)||_has(e.d2c)||_has(e.d3c)||_has(e.d4c)],
+    ['MS morning stock', _has(e.pAutoAM)&&_has(e.pAM)],
+    ['HSD morning stock', _has(e.dAutoAM)&&_has(e.dAM)],
+    ['MS evening stock', _has(e.pAutoPM)&&_has(e.pPM)],
+    ['HSD evening stock', _has(e.dAutoPM)&&_has(e.dPM)],
+    ['HSD sold plausible', e.dSold>=0 && e.dSold<50000],
+    ['MS sold plausible', e.pSold>=0 && e.pSold<50000],
+    ['Collections recorded', ((e.cash||0)+(e.upi||0)+(e.swipe||0)+(e.fleet||0))>0],
+    ['Cash sent to office', _has(e.cashToOffice)],
+    ['No negative values', !entryHasNegative(e)],
+    ['Cash variance in range', Math.abs(e.cashVar||0)<2000],
+    ['Collections within ₹1 cr', (e.totalColl||0)<=10000000],
+    ['Revenue computed', (e.totalRev||0)>0]
+  ];
+}
+function entryScore(e){ var c=entryChecklist(e); return {pass:c.filter(function(x){return x[1];}).length, total:c.length, checks:c}; }
+function reconStatus(e){ var v=Math.abs(e.cashVar||0); if(v<500) return {emoji:'🟢',label:'Reconciled',cls:'ok'}; if(v<2000) return {emoji:'🟡',label:'Small variance',cls:'amber'}; return {emoji:'🔴',label:'Large variance — review',cls:'warn'}; }
+function reconStatusBadge(e){ var st=reconStatus(e); return '<div class="badge '+(st.cls==='ok'?'bg':st.cls==='amber'?'ba':'br')+'" style="display:inline-block;font-size:12px;padding:5px 12px;margin-bottom:10px">'+st.emoji+' '+st.label+' · variance '+inr(e.cashVar||0)+'</div>'; }
+function scoreCardHtml(e){
+  var s=entryScore(e), st=reconStatus(e), pct=Math.round(s.pass/s.total*100);
+  var col = s.pass===s.total ? 'var(--green)' : (s.pass>=s.total-2 ? 'var(--amber)' : 'var(--red)');
+  var rows=s.checks.map(function(c){ return '<div style="display:flex;justify-content:space-between;font-size:11px;padding:2px 0"><span style="color:var(--text2)">'+c[0]+'</span><span>'+(c[1]?'<span style="color:var(--green)">✓</span>':'<span style="color:var(--red)">✗</span>')+'</span></div>'; }).join('');
+  return '<div class="card"><div class="card-title">✅ Completion &amp; Reconciliation</div>'+
+    '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">'+
+    '<div style="font-size:20px;font-weight:800;color:'+col+'">'+s.pass+'/'+s.total+' <span style="font-size:12px;color:var(--text3);font-weight:600">checks passed</span></div>'+
+    '<div class="badge '+(st.cls==='ok'?'bg':st.cls==='amber'?'ba':'br')+'" style="font-size:12px;padding:4px 10px">'+st.emoji+' '+st.label+'</div></div>'+
+    '<div style="height:8px;border-radius:4px;background:var(--border);overflow:hidden;margin-bottom:10px"><div style="height:100%;width:'+pct+'%;background:'+col+'"></div></div>'+
+    '<details><summary style="font-size:12px;color:var(--blue);cursor:pointer">Show checklist</summary><div style="margin-top:6px">'+rows+'</div></details></div>';
+}
 
 function entryDateBounds(){
   var today=todayStr();
@@ -741,6 +797,7 @@ function saveMorning(){
   entries=entries.filter(function(x){ return x.date!==e.date; });
   entries.push(e); entries.sort(function(a,b){ return a.date.localeCompare(b.date); });
   saveEntries();
+  entryDirty=false;
   showToast('✓ Morning saved for '+fmtDate(e.date)+' — finish this evening');
   setTimeout(function(){ nav(1); },700);
 }
@@ -900,6 +957,7 @@ function stepReview(){
   return '<div class="card" style="background:linear-gradient(135deg,var(--blue-d),var(--blue));border:none">'+
     '<div style="font-size:16px;font-weight:800;color:#fff">'+fmtDate(e.date)+'</div>'+
     '<div style="font-size:11px;color:rgba(255,255,255,.65);font-family:var(--mono)">By '+e.reporter+'</div></div>'+
+    scoreCardHtml(e)+
     '<div class="kpi-grid">'+
     '<div class="kpi y"><div class="kv">'+inr(e.totalRev)+'</div><div class="kl">Total Revenue</div></div>'+
     '<div class="kpi '+(e.totalMargin>0?'g':'r')+'"><div class="kv">'+inr(e.totalMargin)+'</div><div class="kl">Gross Profit</div></div>'+
@@ -949,6 +1007,16 @@ function submitEntry(){
   e.savedAt=new Date().toISOString();
   computeEntry(e);
   if(e.totalColl>10000000 || e.dSold>50000 || e.pSold>50000){ if(!confirm('These values look unusually large — collections '+inr(e.totalColl)+', HSD '+Math.round(e.dSold)+' L, MS '+Math.round(e.pSold)+' L. Submit anyway?')) return; }
+  // Pre-submission confirmation with key totals
+  var _st=reconStatus(e), _sc=entryScore(e);
+  var _summary='Submit entry for '+fmtDate(e.date)+'?\n\n'+
+    'HSD sold: '+Math.round(e.dSold)+' L\n'+
+    'MS sold: '+Math.round(e.pSold)+' L\n'+
+    'Total collected: '+inr(e.totalColl)+'\n'+
+    'Cash variance: '+inr(e.cashVar)+'  '+_st.emoji+' '+_st.label+'\n'+
+    'Net profit: '+inr(e.netProfit)+'\n\n'+
+    'Checks passed: '+_sc.pass+'/'+_sc.total;
+  if(!confirm(_summary)) return;
   // Remove existing entry for same date
   entries = entries.filter(function(x){ return x.date!==e.date; });
   entries.push(e);
@@ -957,6 +1025,7 @@ function submitEntry(){
   try{ e.reportHtml=reportHtml(e.date); }catch(err){}   // HTML table version for email
   try{ var _dl=getDeleted(); if(_dl.indexOf(e.date)>=0){ saveDeleted(_dl.filter(function(x){ return x!==e.date; })); } }catch(err){}  // re-entering a date clears its tombstone
   saveEntries();
+  clearAutodraft();
   draft={};curStep=0;
   showToast('✓ Entry saved for '+fmtDate(e.date));
   setTimeout(function(){ nav(1); },600);
@@ -994,6 +1063,7 @@ function dayDetailHTML(e){
   return '<div class="card" style="background:linear-gradient(135deg,var(--blue-d),var(--blue));border:none">'+
     '<div style="font-size:16px;font-weight:800;color:#fff">'+fmtDate(e.date)+'</div>'+
     '<div style="font-size:11px;color:rgba(255,255,255,.65);font-family:var(--mono)">'+fmtDay(e.date)+' · By '+(e.reporter||'—')+(e.type==='import'?' · Imported':'')+'</div></div>'+
+    reconStatusBadge(e)+
     sfAlerts+
     '<div class="kpi-grid">'+
     '<div class="kpi y"><div class="kv">'+inr(e.totalRev)+'</div><div class="kl">Revenue</div></div>'+
@@ -1636,7 +1706,7 @@ function renderBpclResult(d){
   box.innerHTML=summary+table+applyBtn+'<div id="applyPanel" style="margin-top:12px"></div><p style="font-size:12px;color:var(--text3);margin-top:10px">Read-only until you press Apply. Applying stores a dated reconciliation record + the BPCL closing balance and cross-checks invoices against ERP purchases — it does <b>not</b> change any party ledger.</p>';
 }
 
-/* BUILD:rpc-redesign-v17-entryvalidation */
+/* BUILD:rpc-redesign-v18-dataquality-p1 */
 // Parse a Union Bank of India "Statement of Account" PDF (deposit/withdrawal by balance movement)
 function parseBankLines(lines){
   var out={period:'', opening:null, closing:null, rows:[],
