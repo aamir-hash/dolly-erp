@@ -253,7 +253,7 @@ tr.hi-row td{background:rgba(255,220,2,.06)}
   <button class="sbn" onclick="nav(4)" id="sbn4" data-tab="4"><span class="sb-ic">🕐</span>History</button>
   <div class="sb-group">System</div>
   <button class="sbn" onclick="nav(5)" id="sbn5" data-tab="5"><span class="sb-ic">⚙️</span>Settings</button>
-  <div class="sb-foot">Operations ERP · v3.1</div>
+  <div class="sb-foot">Operations ERP · v3.2</div>
 </div>
 
 <div class="bnav">
@@ -291,6 +291,10 @@ tr.hi-row td{background:rgba(255,220,2,.06)}
     <button class="rtab" onclick="rTab(5,this)">🏦 Reconcile</button>
     <button class="rtab" onclick="rTab(6,this)">📋 DSR</button>
     <button class="rtab" onclick="rTab(7,this)">💵 Cash Match</button>
+  </div>
+  <div style="display:flex;gap:8px;justify-content:flex-end;margin:0 0 10px">
+    <button class="rtab" style="flex:0;padding:6px 12px" onclick="window.print()">🖨 Print</button>
+    <button class="rtab" style="flex:0;padding:6px 12px" onclick="exportReportExcel()">⬇ Excel</button>
   </div>
   <div id="reportContent"></div>
 </div>
@@ -398,7 +402,7 @@ tr.hi-row td{background:rgba(255,220,2,.06)}
     <div class="vrow"><span class="vl">Signed in as</span><span class="vv info" id="s-loggedIn">—</span></div>
     <div class="vrow"><span class="vl">Total entries</span><span class="vv info" id="s-count">—</span></div>
     <div class="vrow"><span class="vl">Last entry</span><span class="vv" id="s-last">—</span></div>
-    <div class="vrow"><span class="vl">Version</span><span class="vv muted">3.1 · Jul 2026</span></div>
+    <div class="vrow"><span class="vl">Version</span><span class="vv muted">3.2 · Jul 2026</span></div>
   </div>
 </div>
 
@@ -1249,6 +1253,20 @@ function renderDSR(){
 function loadScriptOnce(src){ return new Promise(function(res,rej){ if(document.querySelector('script[src="'+src+'"]')){ res(); return; } var s=document.createElement('script'); s.src=src; s.onload=function(){ res(); }; s.onerror=function(){ rej(new Error('load fail '+src)); }; document.head.appendChild(s); }); }
 async function ensurePdfJs(){ await loadScriptOnce('https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js'); if(window.pdfjsLib){ window.pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js'; } }
 async function ensureXlsx(){ await loadScriptOnce('https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js'); }
+async function exportReportExcel(){
+  try{
+    await ensureXlsx();
+    var el=document.getElementById('reportContent');
+    var tables=el?el.querySelectorAll('table'):[];
+    if(!tables.length){ showToast('Nothing tabular to export on this view'); return; }
+    var names={0:'Daily',1:'Weekly',2:'Monthly',3:'All-time',5:'Reconcile',6:'DSR',7:'CashMatch'};
+    var base=names[curRTab]||'Report';
+    var wb=XLSX.utils.book_new();
+    tables.forEach(function(t,i){ var ws=XLSX.utils.table_to_sheet(t,{raw:false}); XLSX.utils.book_append_sheet(wb, ws, (base+(tables.length>1?('-'+(i+1)):'')).slice(0,31)); });
+    XLSX.writeFile(wb, 'Dolly_'+base+'_'+todayStr()+'.xlsx');
+    showToast('✓ Exported '+base+' to Excel');
+  }catch(e){ showToast('Export failed: '+e.message); }
+}
 
 // Extract text lines from a PDF (rows reconstructed by y-position)
 async function pdfToLines(arrayBuffer){
@@ -1750,7 +1768,7 @@ function renderBpclResult(d){
   box.innerHTML=summary+table+applyBtn+'<div id="applyPanel" style="margin-top:12px"></div><p style="font-size:12px;color:var(--text3);margin-top:10px">Read-only until you press Apply. Applying stores a dated reconciliation record + the BPCL closing balance and cross-checks invoices against ERP purchases — it does <b>not</b> change any party ledger.</p>';
 }
 
-/* BUILD:rpc-redesign-v22-backup-healthcheck */
+/* BUILD:rpc-redesign-v24-ledger-edit-export */
 // Parse a Union Bank of India "Statement of Account" PDF (deposit/withdrawal by balance movement)
 function parseBankLines(lines){
   var out={period:'', opening:null, closing:null, rows:[],
@@ -2555,7 +2573,7 @@ function getPartyFuel(name){ return getPartyFuelStore()[name]||[]; }
 function getPartySales(partyName){
   var pp=getParties().find(function(p){ return p.name===partyName; });
   if(pp && pp.ledgerDriven){
-    return getPartyFuel(partyName).map(function(x){ return {date:x.date, type:'sale', amount:x.amount, litres:(x.qty||0), rate:(x.rate||0)}; });
+    return getPartyFuel(partyName).map(function(x,i){ return {date:x.date, type:'sale', amount:x.amount, litres:(x.qty||0), rate:(x.rate||0), srcIdx:i, editable:true}; });
   }
   var sales=[];
   entries.filter(function(e){ return e.submitted; }).forEach(function(e){
@@ -2632,6 +2650,50 @@ function addParty(){
   showToast('✓ Party added'); renderParties();
 }
 
+// ── Aamir reconciliation summary card (Apr–Jun 2026, finalised 3-Jul) ──
+// Shows ALL heads — including those folded into openingBalance by Finalise
+// (June infusion, cash-to-office, the late-May fuel not in daily entries) — so
+// Total Sales / Total Paid visibly tie to Outstanding. Read-only; touches no data.
+var INFUSION_FINAL_APRJUN=17366764.22; // confirmed by Aamir 3-Jul-2026 (statements + Gul direct); fallback if statement records absent on this device
+var INFUSION_APRMAY_FINAL=9866265.22;  // bank 27,40,000 (incl 3.5L IMPS) + BPCL 45,06,305.22 + Gul direct 26,19,960
+var RECON_CUTOFF='2026-06-30';
+function aamirReconSummaryHtml(name){
+  if(name!=='AAMIR TRANSPORT') return '';
+  try{
+    var inf=deriveInfusionTotal();
+    var derived=!inf.missing.length;
+    var infTotal=derived?inf.total:INFUSION_FINAL_APRJUN;
+    var aprMay=INFUSION_APRMAY_FINAL;
+    if(derived){ try{ var f=deriveTakeoverFigures(); if(f&&!f.missing.length&&f.matInfusion) aprMay=f.matInfusion; }catch(e){} }
+    var june=Math.round((infTotal-aprMay)*100)/100;
+    var sum=function(a){ return a.reduce(function(s,x){ return s+(x.amount||0); },0); };
+    var sales=getPartySales(name), pays=getPartyPayments(name);
+    var entryFuel=Math.round(sum(sales.filter(function(x){ return x.date>=TAKEOVER_DATE&&x.date<=RECON_CUTOFF; })));
+    var fuelGap=Math.round(AAMIR_FUEL-entryFuel);
+    var julSales=Math.round(sum(sales.filter(function(x){ return x.date>RECON_CUTOFF; })));
+    var julPays=Math.round(sum(pays.filter(function(x){ return x.date>RECON_CUTOFF; })));
+    var recon=Math.round(AAMIR_FUEL+AAMIR_CASH_TO_MAT-infTotal-TAJ_TRANSFER);
+    var computed=recon+julSales-julPays;
+    var live=Math.round(getPartyBalance(name));
+    var lab=function(v){ return v<0?'Dolly owes Aamir':(v>0?'owes Dolly':'nil'); };
+    var row=function(l,v,sub){ return '<div class="vrow"><span class="vl">'+l+(sub?' <span style="font-size:11px;color:var(--text3)">'+sub+'</span>':'')+'</span><span class="vv">'+v+'</span></div>'; };
+    var mism=(Math.abs(computed-live)>1)?'<div style="font-size:12px;color:#b26a00;background:#fff8e1;border:1px solid #ffe08a;border-radius:6px;padding:6px 8px;margin-top:8px">⚠ Live balance '+inr(live)+' differs from this reconciliation ('+inr(computed)+') by '+inr(Math.abs(computed-live))+'. A device may hold stale or duplicate rows — open Settings → ⟳ Pull Now on each device.</div>':'';
+    return '<div class="card" style="margin-bottom:12px"><div class="card-title">📒 Reconciliation summary — Apr–Jun 2026 (final, confirmed 3-Jul)</div>'
+      +row('Fuel drawn — master ledger / MAT sheet','+ '+inr(AAMIR_FUEL))
+      +'<div style="font-size:11px;color:var(--text3);padding-left:6px;margin:-2px 0 4px">= daily entries '+inr(entryFuel)+' + late-May loads never entered as daily entries '+inr(fuelGap)+'</div>'
+      +row('Cash pump → Chandrapur office (→ MAT)','+ '+inr(AAMIR_CASH_TO_MAT))
+      +row('MAT infusion — Apr–May','− '+inr(aprMay),'bank RTGS/IMPS + BPCL 347093/4 + Gul direct')
+      +row('MAT infusion — June','− '+inr(june),'bank + BPCL 347093/4')
+      +'<div style="font-size:11px;color:var(--text3);padding-left:6px;margin:-2px 0 4px">total infusion Apr–Jun '+inr(infTotal)+(derived?' — derived from applied statements ✓':' — stored final figure (statement records not on this device)')+'</div>'
+      +row('Taj Traders credit transferred to Aamir (2-Jul)','− '+inr(TAJ_TRANSFER))
+      +'<div class="vrow" style="border-top:1px solid var(--border);margin-top:6px;padding-top:6px"><span class="vl" style="font-weight:700">Reconciled position 30-Jun</span><span class="vv" style="font-weight:700">'+inr(recon)+' <span style="font-size:11px;color:var(--text3)">'+lab(recon)+'</span></span></div>'
+      +row('Fuel drawn since 1-Jul','+ '+inr(julSales))
+      +row('Payments since 1-Jul','− '+inr(julPays))
+      +'<div class="vrow" style="border-top:1px solid var(--border);margin-top:6px;padding-top:6px"><span class="vl" style="font-weight:700">Current outstanding</span><span class="vv" style="font-weight:700">'+inr(computed)+' <span style="font-size:11px;color:var(--text3)">'+lab(computed)+'</span></span></div>'
+      +mism
+      +'<p style="font-size:11px;color:var(--text3);margin-top:8px">Total Paid above shows only the two posted rows (Apr–May infusion + Taj transfer). June infusion, cash-to-office and the late-May fuel are carried in the reconciliation opening — this card lays out every head so the figures tie.</p></div>';
+  }catch(e){ return ''; }
+}
 function showPartyDetail(name){
   var sales=getPartySales(name);
   var payments=getPartyPayments(name);
@@ -2641,11 +2703,12 @@ function showPartyDetail(name){
     if(t.type==='sale'){
       return '<tr><td>'+fmtDate(t.date)+'</td><td><span class="badge bb">Sale</span></td>'+
         '<td class="r">'+fL(t.litres)+'</td><td class="r">₹'+t.rate+'</td>'+
-        '<td class="r warn">'+inr(t.amount)+'</td><td class="r">—</td></tr>';
+        '<td class="r warn">'+inr(t.amount)+'</td><td class="r">—</td>'+
+        (canEdit()?('<td class="c">'+(t.editable?'<button title="Edit this line" onclick="editLedgerFuel(\''+name.replace(/'/g,"\\'")+'\','+t.srcIdx+')" style="background:none;border:none;cursor:pointer;color:var(--blue);font-size:14px">✎</button>':'')+'</td>'):'')+'</tr>';
     } else {
       return '<tr><td>'+fmtDate(t.date)+'</td><td><span class="badge bg">Payment</span></td>'+
         '<td class="r">—</td><td class="r">—</td>'+
-        '<td class="r">—</td><td class="r ok">'+inr(t.amount)+'</td></tr>';
+        '<td class="r">—</td><td class="r ok">'+inr(t.amount)+'</td>'+(canEdit()?'<td></td>':'')+'</tr>';
     }
   }).join('');
   var parties=getParties();
@@ -2663,11 +2726,29 @@ function showPartyDetail(name){
     (canEdit()?('<div style="display:flex;gap:8px;margin-bottom:12px">'+
     '<button class="btn btn-green btn-sm" style="width:auto;padding:10px 18px;font-size:13px" onclick="recordPayment(\''+name+'\')">💰 Record Payment</button>'+
     (pidx>=0?'<button class="btn btn-outline btn-sm" style="width:auto;padding:10px 18px;font-size:13px" onclick="editPartyRate('+pidx+');closeModal()">✏️ Edit Rate</button>':'')+'</div>'):'')+
-    (rows?'<div class="tbl-wrap"><table><thead><tr><th>Date</th><th>Type</th><th>Litres</th><th>Rate</th><th>Debit</th><th>Credit</th></tr></thead><tbody>'+rows+'</tbody></table></div>':
+    aamirReconSummaryHtml(name)+
+    (rows?'<div class="tbl-wrap"><table><thead><tr><th>Date</th><th>Type</th><th>Litres</th><th>Rate</th><th>Debit</th><th>Credit</th>'+(canEdit()?'<th>Edit</th>':'')+'</tr></thead><tbody>'+rows+'</tbody></table></div>'+(canEdit()?'<p style="font-size:11px;color:var(--text3);margin-top:6px">✎ edits this line\'s litres &amp; rate (admins only). For daily-entry parties, edit via History instead.</p>':''):
     '<p style="text-align:center;color:var(--text3);padding:20px">No transactions yet</p>');
   document.getElementById('detailModal').classList.remove('hidden');
 }
 
+// Admin edit of a ledger-driven party's fuel line (e.g. correct a wrong rate loaded from the master ledger).
+function editLedgerFuel(party, idx){
+  if(!requireEdit()) return;
+  var store=getPartyFuelStore(); var arr=store[party]||[]; var row=arr[idx];
+  if(!row){ showToast('Line not found'); return; }
+  var nl=prompt('Litres for '+fmtDate(row.date)+' ('+party+'):', row.qty); if(nl===null) return;
+  var nr=prompt('Rate ₹/L for '+fmtDate(row.date)+':', row.rate); if(nr===null) return;
+  var q=parseFloat(nl), r=parseFloat(nr);
+  if(isNaN(q)||isNaN(r)||q<0||r<0){ showToast('⚠ Enter valid non-negative litres & rate'); return; }
+  var reason=prompt('Reason for this correction (required):',''); if(reason===null||!reason.trim()){ showToast('Cancelled — reason required'); return; }
+  var before={qty:row.qty, rate:row.rate, amount:row.amount};
+  row.qty=q; row.rate=r; row.amount=Math.round(q*r*100)/100;
+  row.editLog=(row.editLog||[]).concat([{at:new Date().toISOString(), by:(typeof currentDisplayName!=='undefined'&&currentDisplayName)||'admin', reason:reason.trim(), from:before, to:{qty:q,rate:r,amount:row.amount}}]);
+  savePartyFuelStore(store);
+  showToast('✓ Updated '+party+' · '+fmtDate(row.date)+' → '+q+'L @ ₹'+r);
+  showPartyDetail(party);
+}
 function renderParties(){
   var parties=getParties();
   // Self-heal: the ₹4,86,326 cash open item was resolved 3-Jul (cash confirmed ₹55,56,998). Clear the stale banner from any synced data.
