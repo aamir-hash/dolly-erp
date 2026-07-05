@@ -253,7 +253,7 @@ tr.hi-row td{background:rgba(255,220,2,.06)}
   <button class="sbn" onclick="nav(4)" id="sbn4" data-tab="4"><span class="sb-ic">🕐</span>History</button>
   <div class="sb-group">System</div>
   <button class="sbn" onclick="nav(5)" id="sbn5" data-tab="5"><span class="sb-ic">⚙️</span>Settings</button>
-  <div class="sb-foot">Operations ERP · v3.2</div>
+  <div class="sb-foot">Operations ERP · v3.3</div>
 </div>
 
 <div class="bnav">
@@ -402,7 +402,7 @@ tr.hi-row td{background:rgba(255,220,2,.06)}
     <div class="vrow"><span class="vl">Signed in as</span><span class="vv info" id="s-loggedIn">—</span></div>
     <div class="vrow"><span class="vl">Total entries</span><span class="vv info" id="s-count">—</span></div>
     <div class="vrow"><span class="vl">Last entry</span><span class="vv" id="s-last">—</span></div>
-    <div class="vrow"><span class="vl">Version</span><span class="vv muted">3.2 · Jul 2026</span></div>
+    <div class="vrow"><span class="vl">Version</span><span class="vv muted">3.3 · Jul 2026</span></div>
   </div>
 </div>
 
@@ -1253,6 +1253,34 @@ function renderDSR(){
 function loadScriptOnce(src){ return new Promise(function(res,rej){ if(document.querySelector('script[src="'+src+'"]')){ res(); return; } var s=document.createElement('script'); s.src=src; s.onload=function(){ res(); }; s.onerror=function(){ rej(new Error('load fail '+src)); }; document.head.appendChild(s); }); }
 async function ensurePdfJs(){ await loadScriptOnce('https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js'); if(window.pdfjsLib){ window.pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js'; } }
 async function ensureXlsx(){ await loadScriptOnce('https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js'); }
+async function exportLedgerExcel(name){
+  try{
+    await ensureXlsx();
+    var sales=getPartySales(name), pays=getPartyPayments(name);
+    var all=[].concat(sales,pays).sort(function(a,b){ return a.date.localeCompare(b.date); });
+    if(!all.length){ showToast('No transactions to export'); return; }
+    var aoa=[['Dolly Petroleum — '+name+' — Ledger'],['Date','Type','Litres','Rate ₹/L','Debit ₹','Credit ₹']];
+    all.forEach(function(t){ if(t.type==='sale') aoa.push([fmtDate(t.date),'Sale',t.litres,t.rate,t.amount,'']); else aoa.push([fmtDate(t.date),'Payment','','','',t.amount]); });
+    aoa.push([]); aoa.push(['Outstanding balance ₹','','','','',Math.round(getPartyBalance(name))]);
+    var wb=XLSX.utils.book_new(); var ws=XLSX.utils.aoa_to_sheet(aoa);
+    XLSX.utils.book_append_sheet(wb, ws, (name||'Ledger').replace(/[^A-Za-z0-9 ]/g,'').slice(0,31));
+    XLSX.writeFile(wb, 'Dolly_Ledger_'+(name||'party').replace(/[^A-Za-z0-9]+/g,'_')+'_'+todayStr()+'.xlsx');
+    showToast('✓ Exported '+name+' ledger');
+  }catch(e){ showToast('Export failed: '+e.message); }
+}
+function printLedger(name){
+  var sales=getPartySales(name), pays=getPartyPayments(name);
+  var all=[].concat(sales,pays).sort(function(a,b){ return a.date.localeCompare(b.date); });
+  var rows=all.map(function(t){ return t.type==='sale'
+    ? '<tr><td>'+fmtDate(t.date)+'</td><td>Sale</td><td class="r">'+fL(t.litres)+'</td><td class="r">₹'+t.rate+'</td><td class="r">'+inr(t.amount)+'</td><td></td></tr>'
+    : '<tr><td>'+fmtDate(t.date)+'</td><td>Payment</td><td></td><td></td><td></td><td class="r">'+inr(t.amount)+'</td></tr>'; }).join('');
+  var html='<html><head><title>'+name+' — Ledger</title><style>body{font-family:Arial,sans-serif;padding:22px;color:#111}h2{margin:0}.sub{color:#666;font-size:12px;margin:2px 0 12px}table{width:100%;border-collapse:collapse;font-size:12px}th,td{border:1px solid #ccc;padding:6px 9px;text-align:left}.r{text-align:right}th{background:#002A5E;color:#fff}tfoot td{font-weight:bold;background:#f2f4f7}</style></head><body>'+
+    '<h2>Dolly Petroleum — '+name+'</h2><div class="sub">Ledger · outstanding '+inr(getPartyBalance(name))+' · printed '+new Date().toLocaleString('en-IN')+'</div>'+
+    '<table><thead><tr><th>Date</th><th>Type</th><th class="r">Litres</th><th class="r">Rate</th><th class="r">Debit</th><th class="r">Credit</th></tr></thead><tbody>'+rows+'</tbody>'+
+    '<tfoot><tr><td colspan="5" class="r">Outstanding balance</td><td class="r">'+inr(getPartyBalance(name))+'</td></tr></tfoot></table></body></html>';
+  var w=window.open('','_blank'); if(!w){ showToast('Allow pop-ups to print the ledger'); return; }
+  w.document.write(html); w.document.close(); w.focus(); setTimeout(function(){ try{ w.print(); }catch(e){} },350);
+}
 async function exportReportExcel(){
   try{
     await ensureXlsx();
@@ -1768,7 +1796,7 @@ function renderBpclResult(d){
   box.innerHTML=summary+table+applyBtn+'<div id="applyPanel" style="margin-top:12px"></div><p style="font-size:12px;color:var(--text3);margin-top:10px">Read-only until you press Apply. Applying stores a dated reconciliation record + the BPCL closing balance and cross-checks invoices against ERP purchases — it does <b>not</b> change any party ledger.</p>';
 }
 
-/* BUILD:rpc-redesign-v24-ledger-edit-export */
+/* BUILD:rpc-redesign-v25-ledger-print-export */
 // Parse a Union Bank of India "Statement of Account" PDF (deposit/withdrawal by balance movement)
 function parseBankLines(lines){
   var out={period:'', opening:null, closing:null, rows:[],
@@ -2722,6 +2750,10 @@ function showPartyDetail(name){
     '<div class="kpi"><div class="kv">'+inr(sales.reduce(function(s,x){ return s+x.amount; },0))+'</div><div class="kl">Total Sales</div></div>'+
     '<div class="kpi"><div class="kv">'+inr(payments.reduce(function(s,x){ return s+x.amount; },0))+'</div><div class="kl">Total Paid</div></div>'+
     '<div class="kpi"><div class="kv">₹'+(getParties().find(function(p){return p.name===name;})||{hsdRate:90.65}).hsdRate+'/L</div><div class="kl">HSD Rate</div></div>'+
+    '</div>'+
+    '<div style="display:flex;gap:8px;margin-bottom:10px">'+
+    '<button class="btn btn-outline btn-sm" style="width:auto;padding:8px 14px;font-size:12px" onclick="printLedger(\''+name.replace(/'/g,"\\'")+'\')">🖨 Print</button>'+
+    '<button class="btn btn-outline btn-sm" style="width:auto;padding:8px 14px;font-size:12px" onclick="exportLedgerExcel(\''+name.replace(/'/g,"\\'")+'\')">⬇ Excel</button>'+
     '</div>'+
     (canEdit()?('<div style="display:flex;gap:8px;margin-bottom:12px">'+
     '<button class="btn btn-green btn-sm" style="width:auto;padding:10px 18px;font-size:13px" onclick="recordPayment(\''+name+'\')">💰 Record Payment</button>'+
