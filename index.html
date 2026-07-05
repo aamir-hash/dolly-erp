@@ -253,7 +253,7 @@ tr.hi-row td{background:rgba(255,220,2,.06)}
   <button class="sbn" onclick="nav(4)" id="sbn4" data-tab="4"><span class="sb-ic">🕐</span>History</button>
   <div class="sb-group">System</div>
   <button class="sbn" onclick="nav(5)" id="sbn5" data-tab="5"><span class="sb-ic">⚙️</span>Settings</button>
-  <div class="sb-foot">Operations ERP · v3.5</div>
+  <div class="sb-foot">Operations ERP · v3.6</div>
 </div>
 
 <div class="bnav">
@@ -402,7 +402,7 @@ tr.hi-row td{background:rgba(255,220,2,.06)}
     <div class="vrow"><span class="vl">Signed in as</span><span class="vv info" id="s-loggedIn">—</span></div>
     <div class="vrow"><span class="vl">Total entries</span><span class="vv info" id="s-count">—</span></div>
     <div class="vrow"><span class="vl">Last entry</span><span class="vv" id="s-last">—</span></div>
-    <div class="vrow"><span class="vl">Version</span><span class="vv muted">3.5 · Jul 2026</span></div>
+    <div class="vrow"><span class="vl">Version</span><span class="vv muted">3.6 · Jul 2026</span></div>
   </div>
 </div>
 
@@ -708,6 +708,16 @@ function auditLogHtml(e){
 // Lightweight integrity health-check — runs on each sync, writes status into dp_recon_v1 so the
 // existing daily "Dolly Recon Report Email" flow alerts only when something is off. Structural
 // checks only (no exact-balance pins) so it can't false-fail as July+ entries move balances.
+// Credit-rate deviation detector: flags credit sales priced >2% off the party's saved (negotiated) rate.
+// Aamir/MAT excluded (billed at cost by design).
+function creditRateDeviations(entryList){
+  var out=[], parties=getParties();
+  (entryList||[]).forEach(function(e){ if(!e.submitted) return;
+    Object.keys(e.fleetLitresBreakdown||{}).forEach(function(pn){ if(pn==='AAMIR TRANSPORT'||!e.fleetLitresBreakdown[pn]) return; var p=parties.find(function(x){return x.name===pn;}); var std=p&&p.hsdRate; var used=creditRate(pn,e); if(std>0&&used>0&&Math.abs(used-std)/std>0.02) out.push(fmtDate(e.date)+' · '+pn+' HSD ₹'+used+' vs usual ₹'+std); });
+    Object.keys(e.fleetPetrolLitresBreakdown||{}).forEach(function(pn){ if(pn==='AAMIR TRANSPORT'||!e.fleetPetrolLitresBreakdown[pn]) return; var p=parties.find(function(x){return x.name===pn;}); var std=p&&p.msRate; var used=creditRatePetrol(pn,e); if(std>0&&used>0&&Math.abs(used-std)/std>0.02) out.push(fmtDate(e.date)+' · '+pn+' MS ₹'+used+' vs usual ₹'+std); });
+  });
+  return out;
+}
 function healthCheck(){
   var checks=[]; function add(n,ok,d){ checks.push({name:n,status:ok?'OK':'FAIL',detail:d||''}); }
   try{
@@ -724,6 +734,9 @@ function healthCheck(){
     add('Monthly report renders', repOk, '');
     var negE=entries.filter(function(e){ return e.submitted && ((e.cash||0)<0||(e.upi||0)<0||(e.swipe||0)<0||(e.dSold||0)<0||(e.pSold||0)<0); });
     add('No negative entry values', negE.length===0, negE.length+' entries');
+    var cmStart=todayStr().slice(0,7)+'-01';
+    var rdev=creditRateDeviations(entries.filter(function(e){ return e.submitted && e.date>=cmStart; }));
+    add('Credit sales at standard rate (this month)', rdev.length===0, rdev.slice(0,5).join('; ')+(rdev.length>5?(' +'+(rdev.length-5)+' more'):''));
   }catch(e){ add('Health-check ran', false, e.message); }
   var fails=checks.filter(function(c){ return c.status!=='OK'; });
   var status=fails.length?'FAIL':'PASS';
@@ -1056,6 +1069,9 @@ function submitEntry(){
   e.savedAt=new Date().toISOString();
   computeEntry(e);
   if(e.totalColl>10000000 || e.dSold>50000 || e.pSold>50000){ if(!confirm('These values look unusually large — collections '+inr(e.totalColl)+', HSD '+Math.round(e.dSold)+' L, MS '+Math.round(e.pSold)+' L. Submit anyway?')) return; }
+  // Entry-time credit-rate deviation warning
+  var _dev=creditRateDeviations([e]);
+  if(_dev.length){ if(!confirm('⚠ A credit rate differs from the party\'s usual negotiated rate:\n\n'+_dev.join('\n')+'\n\nSubmit anyway?')) return; }
   // Pre-submission confirmation with key totals
   var _st=reconStatus(e), _sc=entryScore(e);
   var _summary='Submit entry for '+fmtDate(e.date)+'?\n\n'+
@@ -1796,7 +1812,7 @@ function renderBpclResult(d){
   box.innerHTML=summary+table+applyBtn+'<div id="applyPanel" style="margin-top:12px"></div><p style="font-size:12px;color:var(--text3);margin-top:10px">Read-only until you press Apply. Applying stores a dated reconciliation record + the BPCL closing balance and cross-checks invoices against ERP purchases — it does <b>not</b> change any party ledger.</p>';
 }
 
-/* BUILD:rpc-redesign-v27-prune-deadcode */
+/* BUILD:rpc-redesign-v28-rate-validation */
 // Parse a Union Bank of India "Statement of Account" PDF (deposit/withdrawal by balance movement)
 function parseBankLines(lines){
   var out={period:'', opening:null, closing:null, rows:[],
