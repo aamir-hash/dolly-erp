@@ -41,6 +41,8 @@ body{font-family:var(--font);background:var(--bg);color:var(--text);font-size:14
   body{padding-left:236px}
   .bnav{display:none}
   .sidebar{display:flex;flex-direction:column;position:fixed;top:0;left:0;bottom:0;width:236px;background:var(--navy);z-index:250;padding:14px 12px;overflow-y:auto}
+  .tb-logo,.tb-title{display:none}
+  .tb-sub{font-size:14px;font-weight:700;color:#fff;font-family:var(--font)}
 }
 /* PAGES */
 .page{display:none;max-width:680px;margin:0 auto;padding:14px}
@@ -251,7 +253,7 @@ tr.hi-row td{background:rgba(255,220,2,.06)}
   <button class="sbn" onclick="nav(4)" id="sbn4" data-tab="4"><span class="sb-ic">🕐</span>History</button>
   <div class="sb-group">System</div>
   <button class="sbn" onclick="nav(5)" id="sbn5" data-tab="5"><span class="sb-ic">⚙️</span>Settings</button>
-  <div class="sb-foot">Operations ERP · v3.0</div>
+  <div class="sb-foot">Operations ERP · v3.1</div>
 </div>
 
 <div class="bnav">
@@ -396,7 +398,7 @@ tr.hi-row td{background:rgba(255,220,2,.06)}
     <div class="vrow"><span class="vl">Signed in as</span><span class="vv info" id="s-loggedIn">—</span></div>
     <div class="vrow"><span class="vl">Total entries</span><span class="vv info" id="s-count">—</span></div>
     <div class="vrow"><span class="vl">Last entry</span><span class="vv" id="s-last">—</span></div>
-    <div class="vrow"><span class="vl">Version</span><span class="vv muted">3.0 · Jul 2026</span></div>
+    <div class="vrow"><span class="vl">Version</span><span class="vv muted">3.1 · Jul 2026</span></div>
   </div>
 </div>
 
@@ -698,6 +700,32 @@ function auditLogHtml(e){
       (ch?'<div style="color:var(--text3);font-family:var(--mono)">'+ch+'</div>':'')+'</div>';
   }).join('');
   return '<div class="card"><div class="card-title">📝 Edit history ('+e.editLog.length+')</div>'+rows+'</div>';
+}
+// Lightweight integrity health-check — runs on each sync, writes status into dp_recon_v1 so the
+// existing daily "Dolly Recon Report Email" flow alerts only when something is off. Structural
+// checks only (no exact-balance pins) so it can't false-fail as July+ entries move balances.
+function healthCheck(){
+  var checks=[]; function add(n,ok,d){ checks.push({name:n,status:ok?'OK':'FAIL',detail:d||''}); }
+  try{
+    var mat=getPayments().filter(function(p){ return p.party==='AAMIR TRANSPORT' && /MAT infusion|MAT bank deposits/i.test(p.note||''); });
+    add('Single MAT infusion row', mat.length<=1, mat.length+' rows');
+    var seen={},dup=0; getPayments().forEach(function(p){ var k=p.party+'|'+p.date+'|'+p.amount+'|'+(p.note||''); if(seen[k]) dup++; seen[k]=1; });
+    add('No duplicate payments', dup===0, dup+' dupes');
+    var today=todayStr(); var bad=entries.filter(function(e){ return e.submitted && (e.date<'2026-04-01' || e.date>today); });
+    add('Entry dates within FY', bad.length===0, bad.length+' bad-date');
+    var run=getParties().filter(function(p){ return Math.abs(getPartyBalance(p.name))>20000000; });
+    add('No runaway balances', run.length===0, run.map(function(p){return p.name;}).join(','));
+    var t=new Date(), pm=new Date(t.getFullYear(),t.getMonth()-1,1), ym=pm.getFullYear()+'-'+String(pm.getMonth()+1).padStart(2,'0');
+    var repOk=true; try{ monthReportHtml(ym); }catch(e){ repOk=false; }
+    add('Monthly report renders', repOk, '');
+    var negE=entries.filter(function(e){ return e.submitted && ((e.cash||0)<0||(e.upi||0)<0||(e.swipe||0)<0||(e.dSold||0)<0||(e.pSold||0)<0); });
+    add('No negative entry values', negE.length===0, negE.length+' entries');
+  }catch(e){ add('Health-check ran', false, e.message); }
+  var fails=checks.filter(function(c){ return c.status!=='OK'; });
+  var status=fails.length?'FAIL':'PASS';
+  var summary=(status==='PASS')?('✓ All '+checks.length+' health checks passed.'):('⚠ '+fails.length+' issue(s): '+fails.map(function(c){return c.name+' ('+c.detail+')';}).join('; '));
+  try{ var rc=JSON.parse(localStorage.getItem('dp_recon_v1')||'{}'); rc.reconCheck={ranAt:new Date().toISOString(),overall:status,checks:checks}; rc.reconCheckStatus=status; rc.reconCheckSummary=summary; localStorage.setItem('dp_recon_v1',JSON.stringify(rc)); }catch(e){}
+  return {status:status,summary:summary,checks:checks};
 }
 
 function entryDateBounds(){
@@ -1118,7 +1146,6 @@ function renderReport(tab){
   if(tab===0) renderDailyReport();
   else if(tab===1) renderWeeklyReport();
   else if(tab===2) renderMonthlyReport();
-  else if(tab===4) renderCheckReport();
   else if(tab===5) renderReconcile();
   else if(tab===6) renderDSR();
   else if(tab===7) renderCashMatch();
@@ -1723,7 +1750,7 @@ function renderBpclResult(d){
   box.innerHTML=summary+table+applyBtn+'<div id="applyPanel" style="margin-top:12px"></div><p style="font-size:12px;color:var(--text3);margin-top:10px">Read-only until you press Apply. Applying stores a dated reconciliation record + the BPCL closing balance and cross-checks invoices against ERP purchases — it does <b>not</b> change any party ledger.</p>';
 }
 
-/* BUILD:rpc-redesign-v21b-csp-framesrc */
+/* BUILD:rpc-redesign-v22-backup-healthcheck */
 // Parse a Union Bank of India "Statement of Account" PDF (deposit/withdrawal by balance movement)
 function parseBankLines(lines){
   var out={period:'', opening:null, closing:null, rows:[],
@@ -2871,6 +2898,7 @@ var spSync = {
       // Preserve the nightly reconCheck health fields across a blind full-file PUT.
       // pull() caches them in dp_recon_v1; write them back so an entry-save can't wipe
       // reconCheckStatus/Summary before the morning alert flow reads them.
+      try{ healthCheck(); }catch(ex){}   // refresh integrity status so the daily alert flow can act on it
       var _rc={}; try{ _rc=JSON.parse(localStorage.getItem('dp_recon_v1')||'{}'); }catch(ex){}
       var payload = JSON.stringify({
         entries: entries,
@@ -2900,6 +2928,15 @@ var spSync = {
         this.lastPush = new Date();
         this.pendingPush = false;
         this.updateStatus('✓ '+this.lastPush.toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit'}));
+        // Automated daily dated backup — first successful sync each day writes a snapshot to Backups/.
+        try{
+          var _bd=todayStr();
+          if(localStorage.getItem('dp_lastbackup')!==_bd){
+            fetch('https://graph.microsoft.com/v1.0/sites/'+sid+'/drive/root:/Operations/Reporting/Backups/dolly_ops_'+_bd+'.json:/content',
+              {method:'PUT', headers:{'Authorization':'Bearer '+tok,'Content-Type':'application/json'}, body: payload})
+              .then(function(r){ if(r.ok){ try{ localStorage.setItem('dp_lastbackup',_bd); }catch(e){} } }).catch(function(){});
+          }
+        }catch(e){}
         return true;
       } else {
         console.log('push HTTP error', resp.status);
