@@ -253,7 +253,7 @@ tr.hi-row td{background:rgba(255,220,2,.06)}
   <button class="sbn" onclick="nav(4)" id="sbn4" data-tab="4"><span class="sb-ic">🕐</span>History</button>
   <div class="sb-group">System</div>
   <button class="sbn" onclick="nav(5)" id="sbn5" data-tab="5"><span class="sb-ic">⚙️</span>Settings</button>
-  <div class="sb-foot">Operations ERP · v3.6</div>
+  <div class="sb-foot">Operations ERP · v3.7</div>
 </div>
 
 <div class="bnav">
@@ -402,7 +402,7 @@ tr.hi-row td{background:rgba(255,220,2,.06)}
     <div class="vrow"><span class="vl">Signed in as</span><span class="vv info" id="s-loggedIn">—</span></div>
     <div class="vrow"><span class="vl">Total entries</span><span class="vv info" id="s-count">—</span></div>
     <div class="vrow"><span class="vl">Last entry</span><span class="vv" id="s-last">—</span></div>
-    <div class="vrow"><span class="vl">Version</span><span class="vv muted">3.6 · Jul 2026</span></div>
+    <div class="vrow"><span class="vl">Version</span><span class="vv muted">3.7 · Aug 2026</span></div>
   </div>
 </div>
 
@@ -1053,8 +1053,14 @@ function submitEntry(){
   // Validation guards: date window, negative values, duplicate date.
   var dv=validateEntryDate(draft.date);
   if(!dv.ok){ showToast('⚠ '+dv.msg); nav(0); return; }
+  // Only validate USER-ENTERED inputs — never derived fields like cashVar/netProfit/margins,
+  // which are legitimately negative and would otherwise false-block edits of existing entries.
+  var INPUT_KEYS=['cash','upi','swipe','fleet','cashToOffice','pRcvd','dRcvd','pBuy','dBuy','pSell','dSell','pTest','dTest',
+    'p1o','p2o','p3o','p4o','p1','p2','p3','p4','d1o','d2o','d3o','d4o','d1','d2','d3','d4',
+    'pAutoAM','pAM','dAutoAM','dAM','pAutoPM','pPM','dAutoPM','dPM'];
   var neg=false;
-  Object.keys(draft).forEach(function(k){ if(k==='date'||k==='reporter'||k==='type'||k==='expenses') return; var val=draft[k]; if(val===''||val==null||typeof val==='boolean') return; if(!isNaN(val)&&Number(val)<0) neg=true; });
+  INPUT_KEYS.forEach(function(k){ var v=draft[k]; if(v===''||v==null) return; if(!isNaN(v)&&Number(v)<0) neg=true; });
+  [draft.fleetLitresBreakdown,draft.fleetRateBreakdown,draft.fleetPetrolLitresBreakdown,draft.fleetPetrolRateBreakdown].forEach(function(o){ if(o) Object.keys(o).forEach(function(p){ if(Number(o[p])<0) neg=true; }); });
   if(Array.isArray(draft.expenses)) draft.expenses.forEach(function(x){ if(Number(x.amount)<0) neg=true; });
   if(neg){ showToast('⚠ Negative values are not allowed.'); return; }
   var dup=entries.find(function(x){ return x.date===draft.date && x.submitted; });
@@ -1812,7 +1818,7 @@ function renderBpclResult(d){
   box.innerHTML=summary+table+applyBtn+'<div id="applyPanel" style="margin-top:12px"></div><p style="font-size:12px;color:var(--text3);margin-top:10px">Read-only until you press Apply. Applying stores a dated reconciliation record + the BPCL closing balance and cross-checks invoices against ERP purchases — it does <b>not</b> change any party ledger.</p>';
 }
 
-/* BUILD:rpc-redesign-v28-rate-validation */
+/* BUILD:rpc-redesign-v29-editnegfix */
 // Parse a Union Bank of India "Statement of Account" PDF (deposit/withdrawal by balance movement)
 function parseBankLines(lines){
   var out={period:'', opening:null, closing:null, rows:[],
