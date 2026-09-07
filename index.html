@@ -253,7 +253,7 @@ tr.hi-row td{background:rgba(255,220,2,.06)}
   <button class="sbn" onclick="nav(4)" id="sbn4" data-tab="4"><span class="sb-ic">🕐</span>History</button>
   <div class="sb-group">System</div>
   <button class="sbn" onclick="nav(5)" id="sbn5" data-tab="5"><span class="sb-ic">⚙️</span>Settings</button>
-  <div class="sb-foot">Operations ERP · v4.1</div>
+  <div class="sb-foot">Operations ERP · v4.3</div>
 </div>
 
 <div class="bnav">
@@ -407,7 +407,7 @@ tr.hi-row td{background:rgba(255,220,2,.06)}
     <div class="vrow"><span class="vl">Signed in as</span><span class="vv info" id="s-loggedIn">—</span></div>
     <div class="vrow"><span class="vl">Total entries</span><span class="vv info" id="s-count">—</span></div>
     <div class="vrow"><span class="vl">Last entry</span><span class="vv" id="s-last">—</span></div>
-    <div class="vrow"><span class="vl">Version</span><span class="vv muted">4.1 · Sep 2026</span></div>
+    <div class="vrow"><span class="vl">Version</span><span class="vv muted">4.3 · Sep 2026</span></div>
   </div>
 </div>
 
@@ -1836,7 +1836,7 @@ function renderBpclResult(d){
   box.innerHTML=summary+table+applyBtn+'<div id="applyPanel" style="margin-top:12px"></div><p style="font-size:12px;color:var(--text3);margin-top:10px">Read-only until you press Apply. Applying stores a dated reconciliation record + the BPCL closing balance and cross-checks invoices against ERP purchases — it does <b>not</b> change any party ledger.</p>';
 }
 
-/* BUILD:rpc-redesign-v33-payroll */
+/* BUILD:rpc-redesign-v35-cashtooffice-mat */
 // Parse a Union Bank of India "Statement of Account" PDF (deposit/withdrawal by balance movement)
 function parseBankLines(lines){
   var out={period:'', opening:null, closing:null, rows:[],
@@ -2486,18 +2486,34 @@ var SK_STAFF='dp_staff_v1';
 function getStaff(){ try{ var s=localStorage.getItem(SK_STAFF); if(s) return JSON.parse(s); }catch(e){} return []; }
 function saveStaff(a){ try{ localStorage.setItem(SK_STAFF, JSON.stringify(a)); }catch(e){} if(typeof spSync!=='undefined'&&spSync.active) spSync.schedulePush(); }
 function monthsInclusive(startYm,endYm){ if(!startYm) return 1; var a=startYm.split('-'),b=endYm.split('-'); var n=(parseInt(b[0],10)-parseInt(a[0],10))*12+(parseInt(b[1],10)-parseInt(a[1],10))+1; return n<1?1:n; }
-// Salary/advance payments to a staff member, read from daily SALARY-dept expenses (matched by name).
-function staffPaid(name, sinceYm){
-  var key=String(name||'').trim().toUpperCase(); if(!key) return 0; var total=0;
+// Salary/advance payments read from daily SALARY-dept expenses, attributed to staff by name.
+function _normNm(x){ return String(x==null?'':x).trim().toUpperCase(); }
+function _salaryExpenses(sinceYm){
+  var out=[];
   entries.forEach(function(e){ if(!e.submitted) return; if(sinceYm && (e.date||'').slice(0,7)<sinceYm) return;
-    (e.expenses||[]).forEach(function(x){ var dept=String(x.dept||'').toUpperCase(), nm=String(x.name||'').toUpperCase(); if(dept.indexOf('SAL')>=0 && nm.indexOf(key)>=0) total+=(Number(x.amount)||0); }); });
+    (e.expenses||[]).forEach(function(x){ if(_normNm(x.dept).indexOf('SAL')>=0) out.push({date:e.date,name:x.name,amount:Number(x.amount)||0}); }); });
+  return out;
+}
+// Match an expense name to exactly ONE staff (bidirectional substring). Returns staff name or null.
+// Handles first-name-only expenses ("Deepak" → "DEEPAK GEADAM") but leaves ambiguous ones (two "Ganesh") unmatched.
+function matchStaffName(expName, staffArr){
+  var nm=_normNm(expName); if(!nm) return null;
+  var hits=(staffArr||getStaff()).filter(function(s){ var sn=_normNm(s.name); return sn && (nm.indexOf(sn)>=0 || sn.indexOf(nm)>=0); });
+  return hits.length===1 ? hits[0].name : null;
+}
+function staffPaid(name, sinceYm){
+  var staffArr=getStaff(), key=_normNm(name), total=0;
+  _salaryExpenses(sinceYm).forEach(function(x){ var m=matchStaffName(x.name, staffArr); if(m && _normNm(m)===key) total+=x.amount; });
   return Math.round(total);
 }
 function staffAccrued(s){ var cur=todayStr().slice(0,7); return Math.round((Number(s.salary)||0)*monthsInclusive(s.startMonth||cur, cur)); }
 function staffBalance(s){ return Math.round((Number(s.openingBal)||0)+staffAccrued(s)-staffPaid(s.name, s.startMonth)); }
+// Salary expenses in the tracking period (from earliest staff startMonth) that match no staff — actionable, excludes history folded into opening balances.
 function unmatchedSalaryExp(){
-  var staff=getStaff().map(function(s){return String(s.name||'').trim().toUpperCase();}).filter(Boolean); var total=0;
-  entries.forEach(function(e){ if(!e.submitted) return; (e.expenses||[]).forEach(function(x){ var dept=String(x.dept||'').toUpperCase(), nm=String(x.name||'').toUpperCase(); if(dept.indexOf('SAL')<0) return; if(!staff.some(function(k){return k&&nm.indexOf(k)>=0;})) total+=(Number(x.amount)||0); }); });
+  var staffArr=getStaff();
+  var since=staffArr.reduce(function(m,s){ var sm=s.startMonth||''; return (sm&&(!m||sm<m))?sm:m; }, '');
+  var total=0;
+  _salaryExpenses(since).forEach(function(x){ if(!matchStaffName(x.name, staffArr)) total+=x.amount; });
   return Math.round(total);
 }
 function renderSalaries(){
@@ -2683,6 +2699,15 @@ function getPartyPayments(partyName){
 }
 
 // Compute outstanding balance for a party
+var MAT_NAME='AAMIR TRANSPORT';
+// Daily "cash sent to office" is cash reaching MAT/Aamir → counts on MAT's ledger (increases what MAT owes).
+// Apr–Jun cash-to-MAT sits in the reconciled opening; Jul–Aug was posted as dated cash rows; so auto-count
+// the daily field only from the parallel-run start (1-Sep) to avoid double-counting those periods.
+var MAT_CASH2OFFICE_FROM='2026-09-01';
+function matCashToOffice(fromDate){
+  var s=0; entries.forEach(function(e){ if(!e.submitted) return; if(fromDate && (e.date||'')<fromDate) return; var v=e.cashToOffice; if(v!=null&&v!=='') s+=(Number(v)||0); });
+  return Math.round(s);
+}
 function getPartyBalance(partyName){
   var party=getParties().find(function(p){ return p.name===partyName; });
   var ob=(party&&party.openingBalance)||0;
@@ -2692,7 +2717,9 @@ function getPartyBalance(partyName){
   if(start){ sales=sales.filter(function(x){ return x.date>=start; }); payments=payments.filter(function(x){ return x.date>=start; }); }
   var totalSales=sales.reduce(function(s,x){ return s+x.amount; },0);
   var totalPaid=payments.reduce(function(s,x){ return s+x.amount; },0);
-  return ob+totalSales-totalPaid;
+  var bal=ob+totalSales-totalPaid;
+  if(partyName===MAT_NAME) bal+=matCashToOffice(MAT_CASH2OFFICE_FROM); // daily cash-to-office → MAT ledger (Sep onward)
+  return bal;
 }
 
 function recordPayment(partyName){
@@ -2805,7 +2832,8 @@ function aamirReconSummaryHtml(name){
     var julSales=Math.round(sum(sales.filter(function(x){ return x.date>RECON_CUTOFF; })));
     var julPays=Math.round(sum(pays.filter(function(x){ return x.date>RECON_CUTOFF; })));
     var recon=Math.round(AAMIR_FUEL+AAMIR_CASH_TO_MAT-infTotal-TAJ_TRANSFER);
-    var computed=recon+julSales-julPays;
+    var c2o=matCashToOffice(MAT_CASH2OFFICE_FROM);
+    var computed=recon+julSales-julPays+c2o;
     var live=Math.round(getPartyBalance(name));
     var lab=function(v){ return v<0?'Dolly owes Aamir':(v>0?'owes Dolly':'nil'); };
     var row=function(l,v,sub){ return '<div class="vrow"><span class="vl">'+l+(sub?' <span style="font-size:11px;color:var(--text3)">'+sub+'</span>':'')+'</span><span class="vv">'+v+'</span></div>'; };
@@ -2822,6 +2850,7 @@ function aamirReconSummaryHtml(name){
       +row('Fuel drawn since 1-Jul','+ '+inr(julSales))
       +row('MAT infusions since 1-Jul','− '+inr(Math.round(sum(pays.filter(function(x){ return x.date>RECON_CUTOFF && x.amount>0; })))))
       +row('Cash to MAT since 1-Jul','+ '+inr(Math.round(-sum(pays.filter(function(x){ return x.date>RECON_CUTOFF && x.amount<0; })))))
+      +(c2o?row('Cash to office → MAT (daily, since 1-Sep)','+ '+inr(c2o)):'')
       +'<div class="vrow" style="border-top:1px solid var(--border);margin-top:6px;padding-top:6px"><span class="vl" style="font-weight:700">Current outstanding</span><span class="vv" style="font-weight:700">'+inr(computed)+' <span style="font-size:11px;color:var(--text3)">'+lab(computed)+'</span></span></div>'
       +mism
       +'<p style="font-size:11px;color:var(--text3);margin-top:8px">The Apr–Jun heads (June infusion, cash-to-office, late-May fuel) are carried in the reconciled 30-Jun opening. From 1-Jul everything is itemised on the ledger: fuel (daily entries), infusions (💰 MAT infusion) and cash (💵 Cash to MAT) — so this card ties to the live balance without any spreadsheet.</p></div>';
