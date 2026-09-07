@@ -253,7 +253,7 @@ tr.hi-row td{background:rgba(255,220,2,.06)}
   <button class="sbn" onclick="nav(4)" id="sbn4" data-tab="4"><span class="sb-ic">🕐</span>History</button>
   <div class="sb-group">System</div>
   <button class="sbn" onclick="nav(5)" id="sbn5" data-tab="5"><span class="sb-ic">⚙️</span>Settings</button>
-  <div class="sb-foot">Operations ERP · v3.8</div>
+  <div class="sb-foot">Operations ERP · v3.9</div>
 </div>
 
 <div class="bnav">
@@ -402,7 +402,7 @@ tr.hi-row td{background:rgba(255,220,2,.06)}
     <div class="vrow"><span class="vl">Signed in as</span><span class="vv info" id="s-loggedIn">—</span></div>
     <div class="vrow"><span class="vl">Total entries</span><span class="vv info" id="s-count">—</span></div>
     <div class="vrow"><span class="vl">Last entry</span><span class="vv" id="s-last">—</span></div>
-    <div class="vrow"><span class="vl">Version</span><span class="vv muted">3.8 · Sep 2026</span></div>
+    <div class="vrow"><span class="vl">Version</span><span class="vv muted">3.9 · Sep 2026</span></div>
   </div>
 </div>
 
@@ -1818,7 +1818,7 @@ function renderBpclResult(d){
   box.innerHTML=summary+table+applyBtn+'<div id="applyPanel" style="margin-top:12px"></div><p style="font-size:12px;color:var(--text3);margin-top:10px">Read-only until you press Apply. Applying stores a dated reconciliation record + the BPCL closing balance and cross-checks invoices against ERP purchases — it does <b>not</b> change any party ledger.</p>';
 }
 
-/* BUILD:rpc-redesign-v30-reconmonthfix */
+/* BUILD:rpc-redesign-v31-cashtomat */
 // Parse a Union Bank of India "Statement of Account" PDF (deposit/withdrawal by balance movement)
 function parseBankLines(lines){
   var out={period:'', opening:null, closing:null, rows:[],
@@ -2598,7 +2598,29 @@ function recordPayment(partyName){
   payments.push({party:partyName,date:todayStr(),amount:amt,note:note});
   savePayments(payments);
   showToast('✓ Payment ₹'+Math.round(amt).toLocaleString('en-IN')+' recorded for '+partyName);
+  try{ if(window.spSync&&spSync.push) spSync.push(); }catch(e){}
   renderParties();
+}
+
+// Record cash physically handed TO a party (e.g. cash to MAT). Stored as a NEGATIVE payment so it
+// increases what the party owes Dolly (getPartyBalance = opening + sales − payments). Captured at
+// source here so the MAT balance stays current and doesn't need periodic accounts-file reconciliation.
+function recordCashToMat(partyName){
+  if(!requireEdit()) return;
+  var amtStr=prompt('Cash transferred TO '+partyName+' (₹):');
+  if(amtStr===null) return;
+  var amt=parseFloat(amtStr);
+  if(isNaN(amt)||amt<=0){ showToast('Invalid amount'); return; }
+  var dt=prompt('Date of transfer (YYYY-MM-DD):', todayStr());
+  if(dt===null) return; dt=dt.trim()||todayStr();
+  if(!/^\d{4}-\d{2}-\d{2}$/.test(dt)){ showToast('⚠ Use date format YYYY-MM-DD'); return; }
+  var note=prompt('Note (optional, e.g. handed to Aamir / driver):') || '';
+  var payments=getPayments();
+  payments.push({party:partyName,date:dt,amount:-Math.abs(amt),note:('Cash transferred to MAT'+(note?' — '+note:''))});
+  savePayments(payments);
+  showToast('✓ Cash to MAT ₹'+Math.round(amt).toLocaleString('en-IN')+' recorded ('+dt+')');
+  try{ if(window.spSync&&spSync.push) spSync.push(); }catch(e){}
+  showPartyDetail(partyName);
 }
 
 function editPartyRate(idx){
@@ -2686,9 +2708,11 @@ function showPartyDetail(name){
         '<td class="r warn">'+inr(t.amount)+'</td><td class="r">—</td>'+
         (canEdit()?('<td class="c">'+(t.editable?'<button title="Edit this line" onclick="editLedgerFuel(\''+name.replace(/'/g,"\\'")+'\','+t.srcIdx+')" style="background:none;border:none;cursor:pointer;color:var(--blue);font-size:14px">✎</button>':'')+'</td>'):'')+'</tr>';
     } else {
-      return '<tr><td>'+fmtDate(t.date)+'</td><td><span class="badge bg">Payment</span></td>'+
+      var isCashOut=t.amount<0; // negative payment = cash paid TO the party (e.g. cash to MAT)
+      return '<tr><td>'+fmtDate(t.date)+'</td><td><span class="badge '+(isCashOut?'bb':'bg')+'">'+(isCashOut?'Cash out':'Payment')+'</span></td>'+
         '<td class="r">—</td><td class="r">—</td>'+
-        '<td class="r">—</td><td class="r ok">'+inr(t.amount)+'</td>'+(canEdit()?'<td></td>':'')+'</tr>';
+        (isCashOut?'<td class="r warn">'+inr(Math.abs(t.amount))+'</td><td class="r">—</td>':'<td class="r">—</td><td class="r ok">'+inr(t.amount)+'</td>')+
+        (canEdit()?'<td></td>':'')+'</tr>';
     }
   }).join('');
   var parties=getParties();
@@ -2709,6 +2733,7 @@ function showPartyDetail(name){
     '</div>'+
     (canEdit()?('<div style="display:flex;gap:8px;margin-bottom:12px">'+
     '<button class="btn btn-green btn-sm" style="width:auto;padding:10px 18px;font-size:13px" onclick="recordPayment(\''+name+'\')">💰 Record Payment</button>'+
+    (name==='AAMIR TRANSPORT'?'<button class="btn btn-outline btn-sm" style="width:auto;padding:10px 18px;font-size:13px" onclick="recordCashToMat(\''+name+'\')">💵 Cash to MAT</button>':'')+
     (pidx>=0?'<button class="btn btn-outline btn-sm" style="width:auto;padding:10px 18px;font-size:13px" onclick="editPartyRate('+pidx+');closeModal()">✏️ Edit Rate</button>':'')+'</div>'):'')+
     aamirReconSummaryHtml(name)+
     (rows?'<div class="tbl-wrap"><table><thead><tr><th>Date</th><th>Type</th><th>Litres</th><th>Rate</th><th>Debit</th><th>Credit</th>'+(canEdit()?'<th>Edit</th>':'')+'</tr></thead><tbody>'+rows+'</tbody></table></div>'+(canEdit()?'<p style="font-size:11px;color:var(--text3);margin-top:6px">✎ edits this line\'s litres &amp; rate (admins only). For daily-entry parties, edit via History instead.</p>':''):
