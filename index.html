@@ -253,7 +253,7 @@ tr.hi-row td{background:rgba(255,220,2,.06)}
   <button class="sbn" onclick="nav(4)" id="sbn4" data-tab="4"><span class="sb-ic">🕐</span>History</button>
   <div class="sb-group">System</div>
   <button class="sbn" onclick="nav(5)" id="sbn5" data-tab="5"><span class="sb-ic">⚙️</span>Settings</button>
-  <div class="sb-foot">Operations ERP · v3.9</div>
+  <div class="sb-foot">Operations ERP · v4.0</div>
 </div>
 
 <div class="bnav">
@@ -402,7 +402,7 @@ tr.hi-row td{background:rgba(255,220,2,.06)}
     <div class="vrow"><span class="vl">Signed in as</span><span class="vv info" id="s-loggedIn">—</span></div>
     <div class="vrow"><span class="vl">Total entries</span><span class="vv info" id="s-count">—</span></div>
     <div class="vrow"><span class="vl">Last entry</span><span class="vv" id="s-last">—</span></div>
-    <div class="vrow"><span class="vl">Version</span><span class="vv muted">3.9 · Sep 2026</span></div>
+    <div class="vrow"><span class="vl">Version</span><span class="vv muted">4.0 · Sep 2026</span></div>
   </div>
 </div>
 
@@ -721,8 +721,21 @@ function creditRateDeviations(entryList){
 function healthCheck(){
   var checks=[]; function add(n,ok,d){ checks.push({name:n,status:ok?'OK':'FAIL',detail:d||''}); }
   try{
-    var mat=getPayments().filter(function(p){ return p.party==='AAMIR TRANSPORT' && /MAT infusion|MAT bank deposits/i.test(p.note||''); });
-    add('Single MAT infusion row', mat.length<=1, mat.length+' rows');
+    // Anti-spiral guard: only the ONE takeover infusion row must be unique (granular infusions are fine now).
+    var matTk=getPayments().filter(function(p){ return p.party==='AAMIR TRANSPORT' && /MAT infusion per statements|MAT bank deposits/i.test(p.note||''); });
+    add('Single takeover MAT-infusion row', matTk.length<=1, matTk.length+' rows');
+    // MAT infusions recorded on the ledger should cover what the bank/BPCL statements show (post-30-Jun). Flag any month short.
+    try{
+      var rs=(getReconStore().reconciliations)||{}, matMis=[];
+      Object.keys(rs).forEach(function(m){
+        if(m<='2026-06') return; var rec=rs[m]||{};
+        var stmt=((rec.bank&&rec.bank.cat&&rec.bank.cat.matIn)||0)+((rec.bpcl&&rec.bpcl.cat&&rec.bpcl.cat.matTransfer)||0);
+        if(stmt<=0) return;
+        var led=getPayments().filter(function(p){ return p.party==='AAMIR TRANSPORT'&&p.amount>0&&(p.date||'').slice(0,7)===m&&/infusion/i.test(p.note||''); }).reduce(function(s,p){ return s+p.amount; },0);
+        if(led < stmt-Math.max(2000,stmt*0.02)) matMis.push(m+': statement '+Math.round(stmt)+' > ledger '+Math.round(led));
+      });
+      add('MAT infusions match statements', matMis.length===0, matMis.join('; '));
+    }catch(e){ add('MAT infusions match statements', false, e.message); }
     var seen={},dup=0; getPayments().forEach(function(p){ var k=p.party+'|'+p.date+'|'+p.amount+'|'+(p.note||''); if(seen[k]) dup++; seen[k]=1; });
     add('No duplicate payments', dup===0, dup+' dupes');
     var today=todayStr(); var bad=entries.filter(function(e){ return e.submitted && (e.date<'2026-04-01' || e.date>today); });
@@ -1818,7 +1831,7 @@ function renderBpclResult(d){
   box.innerHTML=summary+table+applyBtn+'<div id="applyPanel" style="margin-top:12px"></div><p style="font-size:12px;color:var(--text3);margin-top:10px">Read-only until you press Apply. Applying stores a dated reconciliation record + the BPCL closing balance and cross-checks invoices against ERP purchases — it does <b>not</b> change any party ledger.</p>';
 }
 
-/* BUILD:rpc-redesign-v31-cashtomat */
+/* BUILD:rpc-redesign-v32-matcomplete */
 // Parse a Union Bank of India "Statement of Account" PDF (deposit/withdrawal by balance movement)
 function parseBankLines(lines){
   var out={period:'', opening:null, closing:null, rows:[],
@@ -1957,6 +1970,16 @@ function previewApply(){
       + vr('Paid via Union Bank', inr(d.cat.bankPay))
       + vr('MAT BPCL financing', inr(d.cat.matTransfer))
       + vr('BPCL closing balance', inr(d.closing||0), '→ will be tracked as current BPCL balance');
+  }
+  // MAT infusions cross-check: statement-detected MAT financing vs what's recorded on Aamir's ledger for this month.
+  // (Post-30-Jun only; Apr–Jun are folded into the reconciled opening balance.)
+  if(ym>'2026-06'){
+    var stmtMat=Math.round(type==='bank'?(d.cat.matIn||0):(d.cat.matTransfer||0));
+    if(stmtMat>0){
+      var ledMat=Math.round(getPartyPayments('AAMIR TRANSPORT').filter(function(x){ return x.amount>0 && (x.date||'').slice(0,7)===ym && /infusion/i.test(x.note||''); }).reduce(function(s,x){ return s+x.amount; },0));
+      var mOk=ledMat>=stmtMat-Math.max(2000,stmtMat*0.02); // ledger may be higher (cash/NEFT not in this statement); flag only if it's short
+      flags.push({name:'MAT infusions — statement vs ledger', status:mOk?'OK':'MISMATCH', detail:'Statement '+(type==='bank'?'RTGS MAT':'BPCL 347093/4')+' '+inr(stmtMat)+' vs recorded MAT infusions '+inr(ledMat)+' for '+ym+(mOk?' ✓':' — ₹'+Math.round(stmtMat-ledMat).toLocaleString('en-IN')+' not yet on the ledger. Add it via 💰 MAT infusion on Aamir\'s card.')});
+    }
   }
   record.appliedAt=new Date().toISOString(); record.appliedBy=(typeof currentDisplayName!=='undefined'&&currentDisplayName)||'unknown'; record.flags=flags;
   pendingApply={ym:ym, type:type, record:record, bpclBalance:bpclBalance};
@@ -2623,6 +2646,28 @@ function recordCashToMat(partyName){
   showPartyDetail(partyName);
 }
 
+// Record a MAT money-in (infusion) at source: NEFT / cash / BPCL-paid-on-behalf. Positive payment
+// (reduces what MAT owes). Captured here so the MAT balance stays current; statements later cross-check it.
+function recordMatInfusion(partyName){
+  if(!requireEdit()) return;
+  var amtStr=prompt('MAT infusion received from '+partyName+' (₹):');
+  if(amtStr===null) return;
+  var amt=parseFloat(amtStr);
+  if(isNaN(amt)||amt<=0){ showToast('Invalid amount'); return; }
+  var ch=prompt('Channel — Cash / NEFT / BPCL / Other:', 'NEFT');
+  if(ch===null) return; ch=(ch.trim()||'NEFT');
+  var dt=prompt('Date of infusion (YYYY-MM-DD):', todayStr());
+  if(dt===null) return; dt=dt.trim()||todayStr();
+  if(!/^\d{4}-\d{2}-\d{2}$/.test(dt)){ showToast('⚠ Use date format YYYY-MM-DD'); return; }
+  var note=prompt('Note (optional):') || '';
+  var payments=getPayments();
+  payments.push({party:partyName,date:dt,amount:Math.abs(amt),note:('MAT infusion — '+ch+(note?' — '+note:''))});
+  savePayments(payments);
+  showToast('✓ MAT infusion ₹'+Math.round(amt).toLocaleString('en-IN')+' recorded ('+dt+')');
+  try{ if(window.spSync&&spSync.push) spSync.push(); }catch(e){}
+  showPartyDetail(partyName);
+}
+
 function editPartyRate(idx){
   if(!requireEdit()) return;
   var parties=getParties();
@@ -2690,10 +2735,11 @@ function aamirReconSummaryHtml(name){
       +row('Taj Traders credit transferred to Aamir (2-Jul)','− '+inr(TAJ_TRANSFER))
       +'<div class="vrow" style="border-top:1px solid var(--border);margin-top:6px;padding-top:6px"><span class="vl" style="font-weight:700">Reconciled position 30-Jun</span><span class="vv" style="font-weight:700">'+inr(recon)+' <span style="font-size:11px;color:var(--text3)">'+lab(recon)+'</span></span></div>'
       +row('Fuel drawn since 1-Jul','+ '+inr(julSales))
-      +row('Payments since 1-Jul','− '+inr(julPays))
+      +row('MAT infusions since 1-Jul','− '+inr(Math.round(sum(pays.filter(function(x){ return x.date>RECON_CUTOFF && x.amount>0; })))))
+      +row('Cash to MAT since 1-Jul','+ '+inr(Math.round(-sum(pays.filter(function(x){ return x.date>RECON_CUTOFF && x.amount<0; })))))
       +'<div class="vrow" style="border-top:1px solid var(--border);margin-top:6px;padding-top:6px"><span class="vl" style="font-weight:700">Current outstanding</span><span class="vv" style="font-weight:700">'+inr(computed)+' <span style="font-size:11px;color:var(--text3)">'+lab(computed)+'</span></span></div>'
       +mism
-      +'<p style="font-size:11px;color:var(--text3);margin-top:8px">Total Paid above shows only the two posted rows (Apr–May infusion + Taj transfer). June infusion, cash-to-office and the late-May fuel are carried in the reconciliation opening — this card lays out every head so the figures tie.</p></div>';
+      +'<p style="font-size:11px;color:var(--text3);margin-top:8px">The Apr–Jun heads (June infusion, cash-to-office, late-May fuel) are carried in the reconciled 30-Jun opening. From 1-Jul everything is itemised on the ledger: fuel (daily entries), infusions (💰 MAT infusion) and cash (💵 Cash to MAT) — so this card ties to the live balance without any spreadsheet.</p></div>';
   }catch(e){ return ''; }
 }
 function showPartyDetail(name){
@@ -2731,9 +2777,11 @@ function showPartyDetail(name){
     '<button class="btn btn-outline btn-sm" style="width:auto;padding:8px 14px;font-size:12px" onclick="printLedger(\''+name.replace(/'/g,"\\'")+'\')">🖨 Print</button>'+
     '<button class="btn btn-outline btn-sm" style="width:auto;padding:8px 14px;font-size:12px" onclick="exportLedgerExcel(\''+name.replace(/'/g,"\\'")+'\')">⬇ Excel</button>'+
     '</div>'+
-    (canEdit()?('<div style="display:flex;gap:8px;margin-bottom:12px">'+
-    '<button class="btn btn-green btn-sm" style="width:auto;padding:10px 18px;font-size:13px" onclick="recordPayment(\''+name+'\')">💰 Record Payment</button>'+
-    (name==='AAMIR TRANSPORT'?'<button class="btn btn-outline btn-sm" style="width:auto;padding:10px 18px;font-size:13px" onclick="recordCashToMat(\''+name+'\')">💵 Cash to MAT</button>':'')+
+    (canEdit()?('<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px">'+
+    (name==='AAMIR TRANSPORT'
+      ? '<button class="btn btn-green btn-sm" style="width:auto;padding:10px 18px;font-size:13px" onclick="recordMatInfusion(\''+name+'\')">💰 MAT infusion</button>'+
+        '<button class="btn btn-outline btn-sm" style="width:auto;padding:10px 18px;font-size:13px" onclick="recordCashToMat(\''+name+'\')">💵 Cash to MAT</button>'
+      : '<button class="btn btn-green btn-sm" style="width:auto;padding:10px 18px;font-size:13px" onclick="recordPayment(\''+name+'\')">💰 Record Payment</button>')+
     (pidx>=0?'<button class="btn btn-outline btn-sm" style="width:auto;padding:10px 18px;font-size:13px" onclick="editPartyRate('+pidx+');closeModal()">✏️ Edit Rate</button>':'')+'</div>'):'')+
     aamirReconSummaryHtml(name)+
     (rows?'<div class="tbl-wrap"><table><thead><tr><th>Date</th><th>Type</th><th>Litres</th><th>Rate</th><th>Debit</th><th>Credit</th>'+(canEdit()?'<th>Edit</th>':'')+'</tr></thead><tbody>'+rows+'</tbody></table></div>'+(canEdit()?'<p style="font-size:11px;color:var(--text3);margin-top:6px">✎ edits this line\'s litres &amp; rate (admins only). For daily-entry parties, edit via History instead.</p>':''):
