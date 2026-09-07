@@ -254,7 +254,7 @@ tr.hi-row td{background:rgba(255,220,2,.06)}
   <button class="sbn" onclick="nav(4)" id="sbn4" data-tab="4"><span class="sb-ic">🕐</span>History</button>
   <div class="sb-group">System</div>
   <button class="sbn" onclick="nav(5)" id="sbn5" data-tab="5"><span class="sb-ic">⚙️</span>Settings</button>
-  <div class="sb-foot">Operations ERP · v4.7</div>
+  <div class="sb-foot">Operations ERP · v4.8</div>
 </div>
 
 <div class="bnav">
@@ -293,6 +293,7 @@ tr.hi-row td{background:rgba(255,220,2,.06)}
     <button class="rtab" onclick="rTab(5,this)">🏦 Reconcile</button>
     <button class="rtab" onclick="rTab(6,this)">📋 DSR</button>
     <button class="rtab" onclick="rTab(7,this)">💵 Cash Match</button>
+    <button class="rtab" onclick="rTab(8,this)">✅ Monthly Close</button>
   </div>
   <div style="display:flex;gap:8px;justify-content:flex-end;margin:0 0 10px">
     <button class="rtab" style="flex:0;padding:6px 12px" onclick="window.print()">🖨 Print</button>
@@ -409,7 +410,7 @@ tr.hi-row td{background:rgba(255,220,2,.06)}
     <div class="vrow"><span class="vl">Signed in as</span><span class="vv info" id="s-loggedIn">—</span></div>
     <div class="vrow"><span class="vl">Total entries</span><span class="vv info" id="s-count">—</span></div>
     <div class="vrow"><span class="vl">Last entry</span><span class="vv" id="s-last">—</span></div>
-    <div class="vrow"><span class="vl">Version</span><span class="vv muted">4.7 · Sep 2026</span></div>
+    <div class="vrow"><span class="vl">Version</span><span class="vv muted">4.8 · Sep 2026</span></div>
   </div>
   <div class="card" id="priceLogCard">
     <div class="card-title">🏷️ Price change history</div>
@@ -1206,6 +1207,7 @@ function renderReport(tab){
   else if(tab===5) renderReconcile();
   else if(tab===6) renderDSR();
   else if(tab===7) renderCashMatch();
+  else if(tab===8) renderMonthlyClose();
   else renderAllTime();
 }
 
@@ -1849,7 +1851,7 @@ function renderBpclResult(d){
   box.innerHTML=summary+table+applyBtn+'<div id="applyPanel" style="margin-top:12px"></div><p style="font-size:12px;color:var(--text3);margin-top:10px">Read-only until you press Apply. Applying stores a dated reconciliation record + the BPCL closing balance and cross-checks invoices against ERP purchases — it does <b>not</b> change any party ledger.</p>';
 }
 
-/* BUILD:rpc-redesign-v39-expenseregister */
+/* BUILD:rpc-redesign-v40-monthlyclose */
 // Parse a Union Bank of India "Statement of Account" PDF (deposit/withdrawal by balance movement)
 function parseBankLines(lines){
   var out={period:'', opening:null, closing:null, rows:[],
@@ -2341,6 +2343,46 @@ function renderMonthlyReport(){
     expenseRegisterCard;
 }
 
+// ── MONTHLY CLOSE — one-click reconciliation checklist (Phase E) ──────────
+var closeMonth=null;
+function renderMonthlyClose(){
+  var box=document.getElementById('reportContent'); if(!box) return;
+  var months=[...new Set(entries.filter(function(e){return e.submitted;}).map(function(e){return e.date.slice(0,7);}))].sort().reverse();
+  if(!closeMonth || months.indexOf(closeMonth)<0) closeMonth=months[0]||todayStr().slice(0,7);
+  var ym=closeMonth;
+  var month=entries.filter(function(e){return e.submitted && e.date.slice(0,7)===ym;});
+  var rs=(getReconStore().reconciliations)||{}, rec=rs[ym]||{};
+  var checks=[];
+  function add(n,st,d){ checks.push({name:n,status:st,detail:d||''}); } // st: ok/warn/na/info
+  var hsd=0,ms=0; month.forEach(function(e){ hsd+=e.dSold||0; ms+=e.pSold||0; });
+  add('Fuel volumes (nozzle-derived)','info','HSD '+fL(hsd)+' L · MS '+fL(ms)+' L · '+month.length+' days');
+  if(rec.bank){ var bd=Math.round((rec.bank.cat.phonepe||0)+(rec.bank.cat.card||0)), ed=0; month.forEach(function(e){ ed+=(e.upi||0)+(e.swipe||0); }); ed=Math.round(ed); var g=bd-ed; add('Digital collections vs bank', Math.abs(g)<Math.max(2000,ed*0.02)?'ok':'warn','Bank '+inr(bd)+' vs ERP '+inr(ed)+' (gap '+inr(g)+')'); }
+  else add('Digital collections vs bank','na','Apply the Union Bank statement for '+ym);
+  if(rec.bpcl){ var inv=Math.round(rec.bpcl.cat.invoice||0), pu=0; month.forEach(function(e){ pu+=(e.pRcvd||0)*(e.pBuy||0)+(e.dRcvd||0)*(e.dBuy||0); }); pu=Math.round(pu); var pg=inv-pu; add('Purchases vs BPCL invoices', Math.abs(pg)<Math.max(5000,pu*0.01)?'ok':'warn','BPCL '+inr(inv)+' vs ERP '+inr(pu)+' (gap '+inr(pg)+')'); add('BPCL closing balance','info','Statement '+inr(rec.bpcl.closing||0)); }
+  else add('Purchases vs BPCL invoices','na','Apply the BPCL statement for '+ym);
+  var stmtMat=((rec.bank&&rec.bank.cat.matIn)||0)+((rec.bpcl&&rec.bpcl.cat.matTransfer)||0);
+  if(stmtMat>0){ var led=getPartyPayments(MAT_NAME).filter(function(p){return p.amount>0&&(p.date||'').slice(0,7)===ym&&/infusion/i.test(p.note||'');}).reduce(function(s,p){return s+p.amount;},0); add('MAT infusions on ledger vs statement', led>=stmtMat-Math.max(2000,stmtMat*0.02)?'ok':'warn','Statement '+inr(Math.round(stmtMat))+' vs ledger '+inr(Math.round(led))); }
+  var mb=Math.round(getPartyBalance(MAT_NAME)); add('MAT (Aamir) balance','info',inr(mb)+(mb<0?' — Dolly owes':' — owes Dolly'));
+  var others=getParties().filter(function(p){return p.name!==MAT_NAME;}).map(function(p){return escHtml(p.name)+' '+inr(Math.round(getPartyBalance(p.name)));}).join(' · ');
+  if(others) add('Credit-party balances','info',others);
+  var c2o=0; month.forEach(function(e){ var v=e.cashToOffice; if(v!=null&&v!=='') c2o+=Number(v)||0; }); add('Cash to office (→ MAT)','info',inr(Math.round(c2o)));
+  var ex=0; month.forEach(function(e){ ex+=e.totalExp||0; }); add('Total expenses (incl. salaries)','info',inr(Math.round(ex)));
+  var lr=(getLubeSales?getLubeSales():[]).filter(function(s){return (s.date||'').slice(0,7)===ym;}).reduce(function(t,s){return t+(s.amount||0);},0); add('Lubricant sales','info',inr(Math.round(lr)));
+  var hc; try{ hc=healthCheck(); }catch(e){ hc={status:'?',summary:''}; }
+  add('System health check', hc.status==='PASS'?'ok':'warn', hc.summary||'');
+  var warns=checks.filter(function(c){return c.status==='warn';}).length, nas=checks.filter(function(c){return c.status==='na';}).length;
+  var banner = warns? {cls:'alert-b',txt:'🔴 '+warns+' item(s) need attention before closing '+ym} : (nas? {cls:'alert-b',txt:'🟡 Reconciles so far — '+nas+' statement(s) not yet applied for '+ym} : {cls:'alert-g',txt:'✅ All checks reconcile — '+ym+' is ready to close. The sheet is not needed for this month.'});
+  var ic={ok:'✓',warn:'⚠',na:'—',info:'·'}, col={ok:'#1e7d34',warn:'#c0392b',na:'#b26a00',info:'var(--text3)'};
+  var rows=checks.map(function(c){ return '<tr><td style="text-align:center;color:'+col[c.status]+';font-weight:700">'+ic[c.status]+'</td><td>'+escHtml(c.name)+'</td><td style="font-size:11px;color:var(--text2)">'+c.detail+'</td></tr>'; }).join('');
+  var msel=months.map(function(m){ return '<button class="rtab'+(m===ym?' active':'')+'" onclick="closeMonth=\''+m+'\';renderMonthlyClose()">'+new Date(m+'-01').toLocaleDateString('en-IN',{month:'short',year:'2-digit'})+'</button>'; }).join('');
+  var mn=new Date(ym+'-01').toLocaleDateString('en-IN',{month:'long',year:'numeric'});
+  box.innerHTML='<div class="rtabs" style="margin-bottom:12px">'+msel+'</div>'+
+    '<div class="hero"><h2>Monthly Close — '+mn+'</h2><p>Reconciliation checklist across every head</p></div>'+
+    '<div class="alert '+banner.cls+'" style="margin-bottom:12px">'+banner.txt+'</div>'+
+    '<div class="card"><div class="tbl-wrap"><table style="width:100%;border-collapse:collapse"><thead><tr><th style="width:34px"></th><th>Check</th><th>Detail</th></tr></thead><tbody>'+rows+'</tbody></table></div>'+
+    '<p style="font-size:11px;color:var(--text3);margin-top:8px">✓ reconciled · ⚠ needs attention · — statement not applied · · informational. Apply the month\'s bank &amp; BPCL statements (Reconcile tab) to turn the — checks green.</p></div>';
+}
+
 // ── ALL-TIME ──────────────────────────────────────────────────────
 function renderAllTime(){
   var months=[...new Set(entries.filter(function(e){ return e.submitted; }).map(function(e){ return e.date.slice(0,7); }))].sort();
@@ -2663,9 +2705,9 @@ function renderLubricants(){
     return '<tr><td>'+escHtml(p.name||'')+'</td><td style="font-size:11px;color:var(--text3)">'+escHtml(p.desc||'')+'</td>'+
       '<td class="r">'+inr(p.buyRate||0)+'</td><td class="r">'+inr(p.sellRate||0)+'</td><td class="r">'+fL(p.received||0)+'</td><td class="r">'+fL(sold)+'</td>'+
       '<td class="r '+(stock<=0?'warn':'ok')+'">'+fL(stock)+'</td><td class="r">'+inr(margin)+'</td>'+
-      (admin?'<td class="c"><button title="Edit" onclick="editLube(\''+p.id+'\')" style="background:none;border:none;cursor:pointer;color:var(--blue)">✎</button> <button title="Remove" onclick="deleteLube(\''+p.id+'\')" style="background:none;border:none;cursor:pointer;color:var(--red)">🗑</button></td>':'')+'</tr>';
+      (canLube()?('<td class="c"><button title="Edit rates / stock" onclick="editLube(\''+p.id+'\')" style="background:none;border:none;cursor:pointer;color:var(--blue)">✎</button>'+(admin?' <button title="Remove" onclick="deleteLube(\''+p.id+'\')" style="background:none;border:none;cursor:pointer;color:var(--red)">🗑</button>':'')+'</td>'):'')+'</tr>';
   }).join('');
-  var ptable=lubes.length?('<div class="tbl-wrap"><table style="width:100%;border-collapse:collapse"><thead><tr><th>Product</th><th>Pack</th><th class="r">Buy ₹</th><th class="r">Sell ₹</th><th class="r">Recd</th><th class="r">Sold</th><th class="r">Stock</th><th class="r">Margin</th>'+(admin?'<th></th>':'')+'</tr></thead><tbody>'+prows+'</tbody></table></div>'):'<p style="color:var(--text3);padding:8px 0">No products yet.</p>';
+  var ptable=lubes.length?('<div class="tbl-wrap"><table style="width:100%;border-collapse:collapse"><thead><tr><th>Product</th><th>Pack</th><th class="r">Buy ₹</th><th class="r">Sell ₹</th><th class="r">Recd</th><th class="r">Sold</th><th class="r">Stock</th><th class="r">Margin</th>'+(canLube()?'<th></th>':'')+'</tr></thead><tbody>'+prows+'</tbody></table></div>'):'<p style="color:var(--text3);padding:8px 0">No products yet.</p>';
   // Record-sale form (anyone with lubricants access)
   var opts=lubes.map(function(p){ return '<option value="'+p.id+'">'+escHtml(p.name)+' (₹'+(p.sellRate||0)+')</option>'; }).join('');
   var saleForm=canLube()&&lubes.length?('<div style="margin-top:12px;padding-top:10px;border-top:1px solid var(--border)"><div class="card-title" style="font-size:14px">Record a sale</div><div class="grid2">'+
@@ -2698,7 +2740,7 @@ function addLube(){
   saveLubes(lubes); showToast('✓ Product added'); renderLubricants(); try{ if(window.spSync&&spSync.push) spSync.push(); }catch(e){}
 }
 function editLube(id){
-  if(!requireEdit()) return; var lubes=getLubes(); var p=lubes.find(function(x){return x.id===id;}); if(!p) return;
+  if(!canLube()) return; var lubes=getLubes(); var p=lubes.find(function(x){return x.id===id;}); if(!p) return;
   var buy=prompt('Buy rate ₹ for '+p.name+':', p.buyRate||0); if(buy===null) return;
   var sell=prompt('Sell rate ₹:', p.sellRate||0); if(sell===null) return;
   var recd=prompt('Total stock received (qty) — increase this when you restock:', p.received||0); if(recd===null) return;
