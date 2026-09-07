@@ -253,7 +253,7 @@ tr.hi-row td{background:rgba(255,220,2,.06)}
   <button class="sbn" onclick="nav(4)" id="sbn4" data-tab="4"><span class="sb-ic">🕐</span>History</button>
   <div class="sb-group">System</div>
   <button class="sbn" onclick="nav(5)" id="sbn5" data-tab="5"><span class="sb-ic">⚙️</span>Settings</button>
-  <div class="sb-foot">Operations ERP · v3.7</div>
+  <div class="sb-foot">Operations ERP · v3.8</div>
 </div>
 
 <div class="bnav">
@@ -402,7 +402,7 @@ tr.hi-row td{background:rgba(255,220,2,.06)}
     <div class="vrow"><span class="vl">Signed in as</span><span class="vv info" id="s-loggedIn">—</span></div>
     <div class="vrow"><span class="vl">Total entries</span><span class="vv info" id="s-count">—</span></div>
     <div class="vrow"><span class="vl">Last entry</span><span class="vv" id="s-last">—</span></div>
-    <div class="vrow"><span class="vl">Version</span><span class="vv muted">3.7 · Aug 2026</span></div>
+    <div class="vrow"><span class="vl">Version</span><span class="vv muted">3.8 · Sep 2026</span></div>
   </div>
 </div>
 
@@ -1818,7 +1818,7 @@ function renderBpclResult(d){
   box.innerHTML=summary+table+applyBtn+'<div id="applyPanel" style="margin-top:12px"></div><p style="font-size:12px;color:var(--text3);margin-top:10px">Read-only until you press Apply. Applying stores a dated reconciliation record + the BPCL closing balance and cross-checks invoices against ERP purchases — it does <b>not</b> change any party ledger.</p>';
 }
 
-/* BUILD:rpc-redesign-v29-editnegfix */
+/* BUILD:rpc-redesign-v30-reconmonthfix */
 // Parse a Union Bank of India "Statement of Account" PDF (deposit/withdrawal by balance movement)
 function parseBankLines(lines){
   var out={period:'', opening:null, closing:null, rows:[],
@@ -1889,10 +1889,31 @@ function renderBankResult(d){
 }
 
 // ── APPLY / SAVE a parsed statement as a dated reconciliation record ──
+var RECON_MONTHS={jan:'01',feb:'02',mar:'03',apr:'04',may:'05',jun:'06',jul:'07',aug:'08',sep:'09',oct:'10',nov:'11',dec:'12'};
+// Tolerant single-date → 'YYYY-MM' (handles Date objects, DD-MM-YYYY, DD/MM/YYYY, ISO YYYY-MM-DD, 'DD Mon YYYY')
+function ymFromDate(v){
+  if(v==null||v==='') return null;
+  if(v instanceof Date) return v.getUTCFullYear()+'-'+('0'+(v.getUTCMonth()+1)).slice(-2);
+  var s=String(v), m;
+  if(m=s.match(/(\d{4})-(\d{2})-(\d{2})/)) return m[1]+'-'+m[2];            // ISO
+  if(m=s.match(/(\d{1,2})[-\/](\d{1,2})[-\/](\d{4})/)) return m[3]+'-'+('0'+m[2]).slice(-2); // DD-MM-YYYY / DD/MM/YYYY (day-first)
+  if(m=s.match(/(\d{1,2})\s+([A-Za-z]{3})[A-Za-z]*\s+(\d{4})/)) return m[3]+'-'+(RECON_MONTHS[m[2].toLowerCase()]||'01'); // DD Mon YYYY
+  return null;
+}
+// Authoritative month = the most common transaction-row month (format-independent, beats the period line)
+function monthFromRows(rows){
+  if(!rows||!rows.length) return null;
+  var cnt={},best=null,bn=0;
+  rows.forEach(function(r){ var y=ymFromDate(r&&r.date); if(y) cnt[y]=(cnt[y]||0)+1; });
+  Object.keys(cnt).forEach(function(k){ if(cnt[k]>bn){ bn=cnt[k]; best=k; } });
+  return best;
+}
 function reconMonthKey(type,period){
-  if(type==='bank'){ var m=(period||'').match(/(\d{2})-(\d{2})-(\d{4})/); return m?m[3]+'-'+m[2]:null; }
-  var mo={jan:'01',feb:'02',mar:'03',apr:'04',may:'05',jun:'06',jul:'07',aug:'08',sep:'09',oct:'10',nov:'11',dec:'12'};
-  var m=(period||'').match(/(\d{1,2})\s+([A-Za-z]{3})\s+(\d{4})/); return m?m[3]+'-'+(mo[m[2].toLowerCase()]||'01'):null;
+  var p=(period||''), m;
+  if(m=p.match(/(\d{1,2})[-\/](\d{1,2})[-\/](\d{4})/)) return m[3]+'-'+('0'+m[2]).slice(-2); // dash OR slash, day-first
+  if(m=p.match(/(\d{4})-(\d{2})/)) return m[1]+'-'+m[2];                                    // ISO
+  if(m=p.match(/(\d{1,2})\s+([A-Za-z]{3})[A-Za-z]*\s+(\d{4})/)) return m[3]+'-'+(RECON_MONTHS[m[2].toLowerCase()]||'01'); // word month
+  return null;
 }
 function erpDigitalFor(ym){ var s=0; if(ym) entries.filter(function(e){return e.submitted&&e.date.slice(0,7)===ym;}).forEach(function(e){ s+=(e.upi||0)+(e.swipe||0); }); return Math.round(s); }
 function erpPurchasesFor(ym){ var s=0; if(ym) entries.filter(function(e){return e.submitted&&e.date.slice(0,7)===ym;}).forEach(function(e){ s+=(e.pRcvd||0)*(e.pBuy||0)+(e.dRcvd||0)*(e.dBuy||0); }); return Math.round(s); }
@@ -1903,7 +1924,8 @@ function previewApply(){
   if(!hasPerm('reconcile')){ showToast('No permission to reconcile'); return; }
   if(!reconData||!reconData.d){ panel.innerHTML='<p style="color:#c62828">Parse a statement first.</p>'; return; }
   var type=reconData.type, d=reconData.d;
-  var ym=reconMonthKey(type,d.period);
+  // Prefer the actual transaction-row months (format-independent); fall back to the period line.
+  var ym=monthFromRows(d.rows)||reconMonthKey(type,d.period);
   if(!ym){ panel.innerHTML='<div class="card"><p style="color:#c62828">Could not read the statement month, so it can\'t be saved. Check the period line parsed correctly.</p></div>'; return; }
   var vr=function(l,v,note){ return '<div class="vrow"><span class="vl">'+l+'</span><span class="vv">'+v+(note?' <span style="font-size:11px;color:var(--text3)">'+note+'</span>':'')+'</span></div>'; };
   var flags=[], record, bpclBalance=null, body='';
