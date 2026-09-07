@@ -250,16 +250,18 @@ tr.hi-row td{background:rgba(255,220,2,.06)}
   <button class="sbn" onclick="nav(2)" id="sbn2" data-tab="2"><span class="sb-ic">📊</span>Reports</button>
   <div class="sb-group">Money</div>
   <button class="sbn" onclick="nav(3)" id="sbn3" data-tab="3"><span class="sb-ic">🤝</span>Credit Parties</button>
+  <button class="sbn" onclick="nav(6)" id="sbn6" data-tab="6"><span class="sb-ic">🛢️</span>Lubricants</button>
   <button class="sbn" onclick="nav(4)" id="sbn4" data-tab="4"><span class="sb-ic">🕐</span>History</button>
   <div class="sb-group">System</div>
   <button class="sbn" onclick="nav(5)" id="sbn5" data-tab="5"><span class="sb-ic">⚙️</span>Settings</button>
-  <div class="sb-foot">Operations ERP · v4.3</div>
+  <div class="sb-foot">Operations ERP · v4.4</div>
 </div>
 
 <div class="bnav">
   <button class="bn active" onclick="nav(0)" id="bn0" data-tab="0"><span class="bn-icon">✏️</span><span class="bn-label">Entry</span></button>
   <button class="bn" onclick="nav(2)" id="bn2" data-tab="2"><span class="bn-icon">📊</span><span class="bn-label">Reports</span></button>
   <button class="bn" onclick="nav(3)" id="bn3" data-tab="3"><span class="bn-icon">🤝</span><span class="bn-label">Parties</span></button>
+  <button class="bn" onclick="nav(6)" id="bn6" data-tab="6"><span class="bn-icon">🛢️</span><span class="bn-label">Lubes</span></button>
   <button class="bn" onclick="nav(4)" id="bn4" data-tab="4"><span class="bn-icon">🕐</span><span class="bn-label">History</span></button>
   <button class="bn" onclick="nav(5)" id="bn5" data-tab="5"><span class="bn-icon">⚙️</span><span class="bn-label">Settings</span></button>
 </div>
@@ -334,10 +336,10 @@ tr.hi-row td{background:rgba(255,220,2,.06)}
   <div class="card" id="ratesCard">
     <div class="card-title">📋 Current Rates</div>
     <div class="grid2">
-      <div class="field"><label>MS Sell ₹/L</label><input type="number" id="s-pSell" step="0.01" oninput="saveSettings()"/></div>
-      <div class="field"><label>MS Buy ₹/L</label><input type="number" id="s-pBuy" step="0.01" oninput="saveSettings()"/></div>
-      <div class="field"><label>HSD Sell ₹/L</label><input type="number" id="s-dSell" step="0.01" oninput="saveSettings()"/></div>
-      <div class="field"><label>HSD Buy ₹/L</label><input type="number" id="s-dBuy" step="0.01" oninput="saveSettings()"/></div>
+      <div class="field"><label>MS Sell ₹/L</label><input type="number" id="s-pSell" step="0.01" oninput="saveSettings()" onchange="logPriceChange()"/></div>
+      <div class="field"><label>MS Buy ₹/L</label><input type="number" id="s-pBuy" step="0.01" oninput="saveSettings()" onchange="logPriceChange()"/></div>
+      <div class="field"><label>HSD Sell ₹/L</label><input type="number" id="s-dSell" step="0.01" oninput="saveSettings()" onchange="logPriceChange()"/></div>
+      <div class="field"><label>HSD Buy ₹/L</label><input type="number" id="s-dBuy" step="0.01" oninput="saveSettings()" onchange="logPriceChange()"/></div>
     </div>
     <p style="font-size:11px;color:var(--text3);margin-top:4px">Update when BPCL revises prices. New rate applies from next entry.</p>
   </div>
@@ -407,8 +409,18 @@ tr.hi-row td{background:rgba(255,220,2,.06)}
     <div class="vrow"><span class="vl">Signed in as</span><span class="vv info" id="s-loggedIn">—</span></div>
     <div class="vrow"><span class="vl">Total entries</span><span class="vv info" id="s-count">—</span></div>
     <div class="vrow"><span class="vl">Last entry</span><span class="vv" id="s-last">—</span></div>
-    <div class="vrow"><span class="vl">Version</span><span class="vv muted">4.3 · Sep 2026</span></div>
+    <div class="vrow"><span class="vl">Version</span><span class="vv muted">4.4 · Sep 2026</span></div>
   </div>
+  <div class="card" id="priceLogCard">
+    <div class="card-title">🏷️ Price change history</div>
+    <p style="font-size:11px;color:var(--text3);margin:2px 0 8px">Every change to the rates above is logged here with the date — replaces the sheet's price-fluctuation tab.</p>
+    <div id="priceLogBody"></div>
+  </div>
+</div>
+
+<div class="page" id="page6">
+  <div class="hero"><h2>Lubricants</h2><p>Oil, AdBlue &amp; accessories — sales &amp; stock</p></div>
+  <div id="lubesBody"></div>
 </div>
 
 <!-- DETAIL MODAL -->
@@ -596,8 +608,9 @@ function nav(i){
   if(i===3) renderParties();
   if(i===4) renderHistory();
   if(i===5) renderSettings();
-  var subs=['Daily Entry','Today\'s Summary','Reports','Parties','History','Settings'];
-  document.getElementById('topSub').textContent=subs[i];
+  if(i===6) renderLubricants();
+  var subs=['Daily Entry','Today\'s Summary','Reports','Parties','History','Settings','Lubricants'];
+  document.getElementById('topSub').textContent=subs[i]||'';
 }
 function rTab(i,btn){
   document.querySelectorAll('.rtab').forEach(function(b){ b.classList.remove('active'); });
@@ -1836,7 +1849,7 @@ function renderBpclResult(d){
   box.innerHTML=summary+table+applyBtn+'<div id="applyPanel" style="margin-top:12px"></div><p style="font-size:12px;color:var(--text3);margin-top:10px">Read-only until you press Apply. Applying stores a dated reconciliation record + the BPCL closing balance and cross-checks invoices against ERP purchases — it does <b>not</b> change any party ledger.</p>';
 }
 
-/* BUILD:rpc-redesign-v35-cashtooffice-mat */
+/* BUILD:rpc-redesign-v36-lubricants-pricelog */
 // Parse a Union Bank of India "Statement of Account" PDF (deposit/withdrawal by balance movement)
 function parseBankLines(lines){
   var out={period:'', opening:null, closing:null, rows:[],
@@ -2575,6 +2588,113 @@ function deleteStaff(i){
   try{ if(window.spSync&&spSync.push) spSync.push(); }catch(e){}
 }
 
+// ── Price-change log (Phase D) ────────────────────────────────────────────
+var SK_PRICELOG='dp_pricelog_v1';
+function getPriceLog(){ try{ var s=localStorage.getItem(SK_PRICELOG); if(s) return JSON.parse(s); }catch(e){} return []; }
+function savePriceLog(a){ try{ localStorage.setItem(SK_PRICELOG, JSON.stringify(a)); }catch(e){} if(typeof spSync!=='undefined'&&spSync.active) spSync.schedulePush(); }
+function logPriceChange(){
+  try{
+    var r=settings.rates||{}, log=getPriceLog(), last=log[log.length-1];
+    var cur={pSell:+r.pSell||0,pBuy:+r.pBuy||0,dSell:+r.dSell||0,dBuy:+r.dBuy||0};
+    if(!cur.pSell&&!cur.pBuy&&!cur.dSell&&!cur.dBuy) return;
+    if(last && last.pSell===cur.pSell && last.pBuy===cur.pBuy && last.dSell===cur.dSell && last.dBuy===cur.dBuy) return; // unchanged
+    log.push({date:todayStr(), pSell:cur.pSell, pBuy:cur.pBuy, dSell:cur.dSell, dBuy:cur.dBuy, by:(typeof currentDisplayName!=='undefined'&&currentDisplayName)||'—', at:new Date().toISOString()});
+    savePriceLog(log);
+    try{ if(window.spSync&&spSync.push) spSync.push(); }catch(e){}
+    var b=document.getElementById('priceLogBody'); if(b) b.innerHTML=priceLogHtml();
+  }catch(e){}
+}
+function priceLogHtml(){
+  var log=getPriceLog().slice().reverse();
+  if(!log.length) return '<p style="color:var(--text3);padding:6px 0">No price changes logged yet — edits to the rates above are recorded here automatically.</p>';
+  var rows=log.map(function(x){ return '<tr><td>'+fmtDate(x.date)+'</td><td class="r">'+inr(x.pBuy)+'</td><td class="r">'+inr(x.pSell)+'</td><td class="r">'+inr(x.dBuy)+'</td><td class="r">'+inr(x.dSell)+'</td><td>'+escHtml(x.by||'')+'</td></tr>'; }).join('');
+  return '<div class="tbl-wrap"><table style="width:100%;border-collapse:collapse"><thead><tr><th>Date</th><th class="r">MS Buy</th><th class="r">MS Sell</th><th class="r">HSD Buy</th><th class="r">HSD Sell</th><th>By</th></tr></thead><tbody>'+rows+'</tbody></table></div>';
+}
+
+// ── Lubricants / AdBlue (Phase D) ─────────────────────────────────────────
+var SK_LUBES='dp_lubes_v1', SK_LUBESALES='dp_lubesales_v1';
+function getLubes(){ try{ var s=localStorage.getItem(SK_LUBES); if(s) return JSON.parse(s); }catch(e){} return []; }
+function saveLubes(a){ try{ localStorage.setItem(SK_LUBES, JSON.stringify(a)); }catch(e){} if(typeof spSync!=='undefined'&&spSync.active) spSync.schedulePush(); }
+function getLubeSales(){ try{ var s=localStorage.getItem(SK_LUBESALES); if(s) return JSON.parse(s); }catch(e){} return []; }
+function saveLubeSales(a){ try{ localStorage.setItem(SK_LUBESALES, JSON.stringify(a)); }catch(e){} if(typeof spSync!=='undefined'&&spSync.active) spSync.schedulePush(); }
+function lubeSold(pid){ return getLubeSales().filter(function(s){return s.productId===pid;}).reduce(function(t,s){return t+(Number(s.qty)||0);},0); }
+function lubeStock(p){ return (Number(p.received)||0) - lubeSold(p.id); }
+function canLube(){ return hasPerm('lubricants'); }
+function renderLubricants(){
+  var box=document.getElementById('lubesBody'); if(!box) return;
+  var admin=(currentRole==='admin'), lubes=getLubes(), sales=getLubeSales();
+  var prows=lubes.map(function(p){
+    var sold=lubeSold(p.id), stock=(Number(p.received)||0)-sold, margin=(Number(p.sellRate)||0)-(Number(p.buyRate)||0);
+    return '<tr><td>'+escHtml(p.name||'')+'</td><td style="font-size:11px;color:var(--text3)">'+escHtml(p.desc||'')+'</td>'+
+      '<td class="r">'+inr(p.buyRate||0)+'</td><td class="r">'+inr(p.sellRate||0)+'</td><td class="r">'+fL(p.received||0)+'</td><td class="r">'+fL(sold)+'</td>'+
+      '<td class="r '+(stock<=0?'warn':'ok')+'">'+fL(stock)+'</td><td class="r">'+inr(margin)+'</td>'+
+      (admin?'<td class="c"><button title="Edit" onclick="editLube(\''+p.id+'\')" style="background:none;border:none;cursor:pointer;color:var(--blue)">✎</button> <button title="Remove" onclick="deleteLube(\''+p.id+'\')" style="background:none;border:none;cursor:pointer;color:var(--red)">🗑</button></td>':'')+'</tr>';
+  }).join('');
+  var ptable=lubes.length?('<div class="tbl-wrap"><table style="width:100%;border-collapse:collapse"><thead><tr><th>Product</th><th>Pack</th><th class="r">Buy ₹</th><th class="r">Sell ₹</th><th class="r">Recd</th><th class="r">Sold</th><th class="r">Stock</th><th class="r">Margin</th>'+(admin?'<th></th>':'')+'</tr></thead><tbody>'+prows+'</tbody></table></div>'):'<p style="color:var(--text3);padding:8px 0">No products yet.</p>';
+  // Record-sale form (anyone with lubricants access)
+  var opts=lubes.map(function(p){ return '<option value="'+p.id+'">'+escHtml(p.name)+' (₹'+(p.sellRate||0)+')</option>'; }).join('');
+  var saleForm=canLube()&&lubes.length?('<div style="margin-top:12px;padding-top:10px;border-top:1px solid var(--border)"><div class="card-title" style="font-size:14px">Record a sale</div><div class="grid2">'+
+    '<div class="field"><label>Product</label><select id="ls-prod">'+opts+'</select></div>'+
+    '<div class="field"><label>Qty</label><input id="ls-qty" type="number" step="1" min="0"/></div>'+
+    '<div class="field"><label>Date</label><input id="ls-date" type="date" value="'+todayStr()+'"/></div>'+
+    '</div><button class="btn btn-blue btn-sm" style="width:auto;padding:8px 16px" onclick="recordLubeSale()">➕ Record sale</button></div>'):'';
+  // Add-product form (admin)
+  var addForm=admin?('<div style="margin-top:12px;padding-top:10px;border-top:1px solid var(--border)"><div class="card-title" style="font-size:14px">Add product</div><div class="grid2">'+
+    '<div class="field"><label>Name</label><input id="lp-name" placeholder="e.g. MAK 4T PLUS"/></div>'+
+    '<div class="field"><label>Pack / description</label><input id="lp-desc" placeholder="e.g. 900ML 12/box"/></div>'+
+    '<div class="field"><label>Buy rate ₹</label><input id="lp-buy" type="number" step="0.01"/></div>'+
+    '<div class="field"><label>Sell rate ₹</label><input id="lp-sell" type="number" step="0.01"/></div>'+
+    '<div class="field"><label>Stock received (qty)</label><input id="lp-recd" type="number" step="1" value="0"/></div>'+
+    '</div><button class="btn btn-blue btn-sm" style="width:auto;padding:8px 16px" onclick="addLube()">➕ Add product</button></div>'):'';
+  // Totals + recent sales
+  var rev=sales.reduce(function(t,s){return t+(Number(s.amount)||0);},0);
+  var prof=sales.reduce(function(t,s){return t+((Number(s.rate)||0)-(Number(s.buyRate)||0))*(Number(s.qty)||0);},0);
+  var recent=sales.slice().sort(function(a,b){return (b.date||'').localeCompare(a.date||'');}).slice(0,15).map(function(s){
+    return '<tr><td>'+fmtDate(s.date)+'</td><td>'+escHtml(s.productName||'')+'</td><td class="r">'+fL(s.qty)+'</td><td class="r">'+inr(s.amount)+'</td>'+(admin?'<td class="c"><button onclick="deleteLubeSale(\''+s.id+'\')" style="background:none;border:none;cursor:pointer;color:var(--red)">🗑</button></td>':'')+'</tr>';
+  }).join('');
+  var salesTable=sales.length?('<div style="margin-top:14px"><div class="card-title" style="font-size:14px">Recent sales · total revenue '+inr(rev)+' · profit '+inr(Math.round(prof))+'</div><div class="tbl-wrap"><table style="width:100%;border-collapse:collapse"><thead><tr><th>Date</th><th>Product</th><th class="r">Qty</th><th class="r">Amount</th>'+(admin?'<th></th>':'')+'</tr></thead><tbody>'+recent+'</tbody></table></div></div>'):'';
+  box.innerHTML='<div class="card"><div class="card-title">🛢️ Products &amp; stock</div>'+ptable+saleForm+addForm+'</div>'+(salesTable?('<div class="card">'+salesTable+'</div>'):'');
+}
+function addLube(){
+  if(!requireEdit()) return;
+  var name=((document.getElementById('lp-name')||{}).value||'').trim(); if(!name){ showToast('Enter product name'); return; }
+  var lubes=getLubes();
+  lubes.push({id:'lb'+Date.now(), name:name, desc:((document.getElementById('lp-desc')||{}).value||'').trim(), buyRate:parseFloat((document.getElementById('lp-buy')||{}).value||0)||0, sellRate:parseFloat((document.getElementById('lp-sell')||{}).value||0)||0, received:parseFloat((document.getElementById('lp-recd')||{}).value||0)||0, active:true});
+  saveLubes(lubes); showToast('✓ Product added'); renderLubricants(); try{ if(window.spSync&&spSync.push) spSync.push(); }catch(e){}
+}
+function editLube(id){
+  if(!requireEdit()) return; var lubes=getLubes(); var p=lubes.find(function(x){return x.id===id;}); if(!p) return;
+  var buy=prompt('Buy rate ₹ for '+p.name+':', p.buyRate||0); if(buy===null) return;
+  var sell=prompt('Sell rate ₹:', p.sellRate||0); if(sell===null) return;
+  var recd=prompt('Total stock received (qty) — increase this when you restock:', p.received||0); if(recd===null) return;
+  var desc=prompt('Pack / description:', p.desc||''); if(desc===null) return;
+  p.buyRate=parseFloat(buy)||0; p.sellRate=parseFloat(sell)||0; p.received=parseFloat(recd)||0; p.desc=desc.trim();
+  saveLubes(lubes); showToast('✓ Updated '+p.name); renderLubricants(); try{ if(window.spSync&&spSync.push) spSync.push(); }catch(e){}
+}
+function deleteLube(id){
+  if(!requireEdit()) return; var lubes=getLubes(); var p=lubes.find(function(x){return x.id===id;}); if(!p) return;
+  if(lubeSold(id)>0){ showToast('⚠ Has sales — cannot delete; set stock/rates instead'); return; }
+  if(!confirm('Remove '+p.name+'?')) return;
+  saveLubes(lubes.filter(function(x){return x.id!==id;})); showToast('✓ Removed'); renderLubricants(); try{ if(window.spSync&&spSync.push) spSync.push(); }catch(e){}
+}
+function recordLubeSale(){
+  if(!canLube()){ showToast('No permission'); return; }
+  var pid=(document.getElementById('ls-prod')||{}).value; var p=getLubes().find(function(x){return x.id===pid;});
+  if(!p){ showToast('Pick a product'); return; }
+  var qty=parseFloat((document.getElementById('ls-qty')||{}).value||0);
+  if(isNaN(qty)||qty<=0){ showToast('Enter quantity'); return; }
+  var dt=((document.getElementById('ls-date')||{}).value||'').trim()||todayStr();
+  if(!/^\d{4}-\d{2}-\d{2}$/.test(dt)){ showToast('⚠ Pick a valid date'); return; }
+  if(qty>lubeStock(p) && !confirm('Only '+fL(lubeStock(p))+' in stock. Record anyway?')) return;
+  var sales=getLubeSales();
+  sales.push({id:'lx'+Date.now(), date:dt, productId:p.id, productName:p.name, qty:qty, rate:Number(p.sellRate)||0, buyRate:Number(p.buyRate)||0, amount:Math.round(qty*(Number(p.sellRate)||0)*100)/100, by:(typeof currentDisplayName!=='undefined'&&currentDisplayName)||'—', at:new Date().toISOString()});
+  saveLubeSales(sales); showToast('✓ Sale recorded — '+p.name+' ×'+qty); renderLubricants(); try{ if(window.spSync&&spSync.push) spSync.push(); }catch(e){}
+}
+function deleteLubeSale(id){
+  if(!requireEdit()) return; if(!confirm('Delete this sale? Stock returns.')) return;
+  saveLubeSales(getLubeSales().filter(function(s){return s.id!==id;})); showToast('✓ Sale deleted'); renderLubricants(); try{ if(window.spSync&&spSync.push) spSync.push(); }catch(e){}
+}
+
 function renderSettings(){
   var s=settings;
   renderRolePerms();
@@ -2607,6 +2727,7 @@ function renderSettings(){
   var idle=document.getElementById('s-idleLock'); if(idle) idle.value=settings.idleLockMin||0;
   var salCard=document.getElementById('salariesCard'); if(salCard) salCard.style.display=(currentRole==='admin')?'':'none';
   if(currentRole==='admin') renderSalaries();
+  var plb=document.getElementById('priceLogBody'); if(plb) plb.innerHTML=priceLogHtml();
 }
 
 function exportBackup(){
@@ -3060,6 +3181,9 @@ var spSync = {
       // Cache the per-party fuel ledger store (cloud-authoritative) so a blind push doesn't wipe it.
       try{ if('partyFuel' in data && data.partyFuel){ localStorage.setItem(SK_PARTYFUEL, JSON.stringify(data.partyFuel)); } }catch(ex){}
       try{ if('staff' in data && data.staff){ localStorage.setItem(SK_STAFF, JSON.stringify(data.staff)); } }catch(ex){}
+      try{ if('lubes' in data && data.lubes){ localStorage.setItem(SK_LUBES, JSON.stringify(data.lubes)); } }catch(ex){}
+      try{ if('lubeSales' in data && data.lubeSales){ localStorage.setItem(SK_LUBESALES, JSON.stringify(data.lubeSales)); } }catch(ex){}
+      try{ if('priceLog' in data && data.priceLog){ localStorage.setItem(SK_PRICELOG, JSON.stringify(data.priceLog)); } }catch(ex){}
 
       // cloud is the source of truth for deletion tombstones, so BOTH deletes and re-entries propagate
       var deletedSet = data.deletedDates || [];
@@ -3173,6 +3297,9 @@ var spSync = {
         reconTakeover: (getReconStore().takeover)||null,
         partyFuel: getPartyFuelStore(),
         staff: getStaff(),
+        lubes: getLubes(),
+        lubeSales: getLubeSales(),
+        priceLog: getPriceLog(),
         lastUpdated: new Date().toISOString(),
         updatedBy: currentDisplayName||'unknown'
       });
@@ -3241,6 +3368,7 @@ var PERMS=[
   {k:'records',    i:'🗂️', n:'Records',               d:'View past submitted reports',       tab:4},
   {k:'reports',    i:'📊', n:'Reports',               d:'Monthly summary & DSR',             tab:2},
   {k:'parties',    i:'🤝', n:'Parties',               d:'View credit-party ledgers',         tab:3},
+  {k:'lubricants', i:'🛢️', n:'Lubricants',            d:'Lubricant/AdBlue sales & stock',    tab:6},
   {k:'fuelPrices', i:'💰', n:'Fuel Prices',           d:'View & update prices'},
   {k:'viewProfit', i:'📈', n:'View Profit',           d:'See margin & P&L data'},
   {k:'editEntries',i:'✏️', n:'Edit / Delete Entries', d:'Change or remove submitted entries'},
@@ -3248,8 +3376,8 @@ var PERMS=[
   {k:'settings',   i:'⚙️', n:'Settings',              d:'Open the settings tab',             tab:5}
 ];
 var DEFAULT_PERMS={
-  admin:    {dashboard:1,dailyEntry:1,records:1,reports:1,parties:1,fuelPrices:1,viewProfit:1,editEntries:1,reconcile:1,settings:1},
-  operator: {dashboard:1,dailyEntry:1,records:0,reports:0,parties:0,fuelPrices:0,viewProfit:0,editEntries:0,reconcile:0,settings:0}
+  admin:    {dashboard:1,dailyEntry:1,records:1,reports:1,parties:1,lubricants:1,fuelPrices:1,viewProfit:1,editEntries:1,reconcile:1,settings:1},
+  operator: {dashboard:1,dailyEntry:1,records:0,reports:0,parties:0,lubricants:1,fuelPrices:0,viewProfit:0,editEntries:0,reconcile:0,settings:0}
 };
 function getRolePerms(){
   var rp=(settings&&settings.rolePerms)||{};
