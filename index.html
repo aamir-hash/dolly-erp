@@ -254,7 +254,7 @@ tr.hi-row td{background:rgba(255,220,2,.06)}
   <button class="sbn" onclick="nav(4)" id="sbn4" data-tab="4"><span class="sb-ic">🕐</span>History</button>
   <div class="sb-group">System</div>
   <button class="sbn" onclick="nav(5)" id="sbn5" data-tab="5"><span class="sb-ic">⚙️</span>Settings</button>
-  <div class="sb-foot">Operations ERP · v4.5</div>
+  <div class="sb-foot">Operations ERP · v4.7</div>
 </div>
 
 <div class="bnav">
@@ -409,7 +409,7 @@ tr.hi-row td{background:rgba(255,220,2,.06)}
     <div class="vrow"><span class="vl">Signed in as</span><span class="vv info" id="s-loggedIn">—</span></div>
     <div class="vrow"><span class="vl">Total entries</span><span class="vv info" id="s-count">—</span></div>
     <div class="vrow"><span class="vl">Last entry</span><span class="vv" id="s-last">—</span></div>
-    <div class="vrow"><span class="vl">Version</span><span class="vv muted">4.5 · Sep 2026</span></div>
+    <div class="vrow"><span class="vl">Version</span><span class="vv muted">4.7 · Sep 2026</span></div>
   </div>
   <div class="card" id="priceLogCard">
     <div class="card-title">🏷️ Price change history</div>
@@ -1849,7 +1849,7 @@ function renderBpclResult(d){
   box.innerHTML=summary+table+applyBtn+'<div id="applyPanel" style="margin-top:12px"></div><p style="font-size:12px;color:var(--text3);margin-top:10px">Read-only until you press Apply. Applying stores a dated reconciliation record + the BPCL closing balance and cross-checks invoices against ERP purchases — it does <b>not</b> change any party ledger.</p>';
 }
 
-/* BUILD:rpc-redesign-v37-matcashrows */
+/* BUILD:rpc-redesign-v39-expenseregister */
 // Parse a Union Bank of India "Statement of Account" PDF (deposit/withdrawal by balance movement)
 function parseBankLines(lines){
   var out={period:'', opening:null, closing:null, rows:[],
@@ -1976,7 +1976,7 @@ function previewApply(){
       + vr('Deposits / withdrawals', inr(d.totalDep)+' / '+inr(d.totalWd))
       + vr('Closing balance', inr(d.closing||0))
       + vr('Digital vs ERP collections', inr(digital)+' vs '+inr(erpDig), (gapOk?'✓ within tolerance':'⚠ gap '+inr(gap)))
-      + '<div style="margin-top:8px;padding:8px;background:var(--bg2);border-radius:8px;font-size:12px;color:var(--text2)">🚛 MAT deposits <b>'+inr(d.cat.matIn)+'</b> ('+d.counts.matIn+') were detected but are <b>NOT</b> posted to Aamir\'s ledger — his balance is governed by the master Excel ledger and the nightly check. This record just files the statement.</div>';
+      + '<div style="margin-top:8px;padding:8px;background:var(--bg2);border-radius:8px;font-size:12px;color:var(--text2)">🚛 MAT deposits <b>'+inr(d.cat.matIn)+'</b> ('+d.counts.matIn+') detected. '+(ym>='2026-09'?'On Confirm these are <b>posted to Aamir\'s ledger</b> as MAT infusions (auto, de-duped — safe to re-apply).':'Not posted for this month — Apr–Aug are already reconciled; this just files the statement.')+'</div>';
   } else {
     var inv=Math.round(d.cat.invoice), erpPur=erpPurchasesFor(ym), pgap=inv-erpPur;
     var pOk=Math.abs(pgap)<Math.max(5000,erpPur*0.01);
@@ -2009,6 +2009,28 @@ function previewApply(){
     '<p style="font-size:11px;color:var(--text3);margin-top:8px">Saves a reconciliation record'+(type==='bpcl'?' and updates the tracked BPCL balance':'')+'. No party ledger is touched. Syncs to all devices.</p></div>';
 }
 function cancelApply(){ pendingApply=null; var p=document.getElementById('applyPanel'); if(p) p.innerHTML=''; }
+// Auto-post statement MAT financing (bank RTGS + BPCL 347093/4) to Aamir's ledger — Sept onward only
+// (Apr–Jun are in the reconciled opening; Jul–Aug are already posted as rows). Idempotent per statement.
+function autoPostMatFromStatement(ym, type){
+  try{
+    if(!(ym>='2026-09') || (type!=='bank' && type!=='bpcl')) return 0;
+    if(!reconData || !reconData.d) return 0;
+    var kind = (type==='bank')?'matIn':'matTransfer';
+    var rows=(reconData.d.rows||[]).filter(function(r){ return r.kind===kind && (Number(r.amt!=null?r.amt:r.amount)||0)>0; });
+    var tag='[stmt-auto '+type.toUpperCase()+' '+ym+']';
+    var pays=getPayments().filter(function(p){ return !(p.party===MAT_NAME && (p.note||'').indexOf(tag)>=0); }); // prune prior auto rows for this statement (re-apply safe)
+    var n=0;
+    rows.forEach(function(r){
+      var amt=Number(r.amt!=null?r.amt:r.amount)||0; if(amt<=0) return;
+      var m=String(r.date||'').match(/(\d{1,2})[-\/](\d{1,2})[-\/](\d{4})/);
+      var iso = m ? (m[3]+'-'+('0'+m[2]).slice(-2)+'-'+('0'+m[1]).slice(-2)) : (ym+'-01');
+      pays.push({party:MAT_NAME, date:iso, amount:Math.round(amt*100)/100, note:'MAT infusion — '+(type==='bank'?'bank RTGS':'BPCL 347093/4')+' (auto from statement) '+tag, at:new Date().toISOString()});
+      n++;
+    });
+    if(n){ savePayments(pays); }
+    return n;
+  }catch(e){ return 0; }
+}
 function commitApply(){
   if(!pendingApply){ return; }
   if(!hasPerm('reconcile')){ showToast('No permission'); return; }
@@ -2018,9 +2040,11 @@ function commitApply(){
   // Only move the tracked BPCL balance FORWARD — applying an older month must not regress it
   if(pendingApply.bpclBalance){ var curB=s.bpclBalance; if(!curB||!curB.month||!pendingApply.bpclBalance.month||pendingApply.bpclBalance.month>=curB.month) s.bpclBalance=pendingApply.bpclBalance; }
   saveReconStore(s);
-  showToast('✓ '+pendingApply.type.toUpperCase()+' reconciliation saved for '+pendingApply.ym);
+  var posted=autoPostMatFromStatement(pendingApply.ym, pendingApply.type);
+  showToast('✓ '+pendingApply.type.toUpperCase()+' reconciliation saved for '+pendingApply.ym+(posted?(' · '+posted+' MAT infusion row(s) posted to Aamir'):''));
   pendingApply=null;
   renderReconcile();
+  try{ if(window.spSync&&spSync.push) spSync.push(); }catch(e){}
 }
 
 // ── (Legacy RECONCILIATION CHECKER removed v27) — Check sub-tab retired; the old
@@ -2270,6 +2294,16 @@ function renderMonthlyReport(){
     '<td class="r info"><strong>'+Math.round(tPurMS).toLocaleString('en-IN')+' L</strong></td>'+
     '<td class="r"><strong>'+inr(tPurVal)+'</strong></td></tr></tbody></table></div></div>';
   var mn=new Date(rptMonth+'-01').toLocaleDateString('en-IN',{month:'long',year:'numeric'});
+  // ── Expense Register — every expense grouped by head, for spend control ──
+  var expHeads={}, expItems=[], expTotal=0;
+  month.forEach(function(e){ (e.expenses||[]).forEach(function(x){ var amt=Number(x.amount)||0; if(!amt) return; var head=(String(x.dept||'').trim()||'UNCATEGORISED').toUpperCase(); expHeads[head]=(expHeads[head]||0)+amt; expTotal+=amt; expItems.push({date:e.date,name:x.name||'',head:head,amt:amt}); }); });
+  var headKeys=Object.keys(expHeads).sort(function(a,b){ return expHeads[b]-expHeads[a]; });
+  var headRows=headKeys.map(function(h){ var v=expHeads[h]; return '<tr><td>'+escHtml(h)+'</td><td class="r warn">'+inr(v)+'</td><td class="r">'+(expTotal?Math.round(v/expTotal*100):0)+'%</td></tr>'; }).join('');
+  var itemRows=expItems.sort(function(a,b){ return (a.date||'').localeCompare(b.date||'') || (b.amt-a.amt); }).map(function(x){ return '<tr><td style="white-space:nowrap">'+fmtDate(x.date)+'</td><td>'+escHtml(x.name)+'</td><td style="font-size:10px;color:var(--text3)">'+escHtml(x.head)+'</td><td class="r">'+inr(x.amt)+'</td></tr>'; }).join('');
+  var expenseRegisterCard='<div class="card"><div class="card-title">🧾 Expense Register — '+mn+'</div>'+
+    '<div class="tbl-wrap"><table><thead><tr><th>Head</th><th class="r">Amount</th><th class="r">Share</th></tr></thead><tbody>'+(headRows||'<tr><td colspan="3" style="text-align:center;color:var(--text3);padding:12px">No expenses this month</td></tr>')+
+    (headKeys.length?'<tr class="total-row"><td><strong>TOTAL</strong></td><td class="r"><strong>'+inr(expTotal)+'</strong></td><td class="r"><strong>100%</strong></td></tr>':'')+'</tbody></table></div>'+
+    (expItems.length?('<div class="card-title" style="font-size:14px;margin-top:14px">All entries ('+expItems.length+')</div><div class="tbl-wrap"><table><thead><tr><th>Date</th><th>Particulars</th><th>Head</th><th class="r">Amount</th></tr></thead><tbody>'+itemRows+'</tbody></table></div>'):'')+'</div>';
   document.getElementById('reportContent').innerHTML=
     '<div class="rtabs" style="margin-bottom:12px">'+
     months.map(function(m){ return '<button class="rtab'+(m===rptMonth?' active':'')+'" onclick="rptMonth=\''+m+'\';renderMonthlyReport()">'+new Date(m+'-01').toLocaleDateString('en-IN',{month:'short',year:'2-digit'})+'</button>'; }).join('')+
@@ -2303,7 +2337,8 @@ function renderMonthlyReport(){
     '<td class="r warn"><strong>'+inr(tExp)+'</strong></td>'+
     '<td class="r '+(tProfit>=0?'ok':'warn')+'"><strong>'+inr(tProfit)+'</strong></td></tr>'+
     '</tbody></table></div></div>'+
-    purchasesCard;
+    purchasesCard+
+    expenseRegisterCard;
 }
 
 // ── ALL-TIME ──────────────────────────────────────────────────────
