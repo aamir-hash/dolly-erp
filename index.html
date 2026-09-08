@@ -201,6 +201,29 @@ tr.hi-row td{background:rgba(255,220,2,.06)}
 .um-info{flex:1}
 .um-name{font-size:13px;font-weight:600;color:var(--text)}
 .um-role{font-size:10px;color:var(--text3)}
+
+/* ── v4.4 UI refinements (presentational only) ── */
+:root{--shadow-sm:0 1px 2px rgba(16,25,34,.05),0 1px 3px rgba(16,25,34,.05);--shadow-md:0 6px 20px rgba(16,25,34,.10)}
+body{background:#F4F6FA}
+.card{border:1px solid #E8ECF3;border-radius:14px;box-shadow:var(--shadow-sm)}
+.card-title{padding-bottom:10px;letter-spacing:.05em}
+.btn{border-radius:11px;box-shadow:var(--shadow-sm);transition:transform .06s ease,box-shadow .15s ease,opacity .15s ease}
+.btn:hover{box-shadow:var(--shadow-md)}
+.btn:active{transform:translateY(1px)}
+.btn-outline{border-width:1px}
+.kpi{border-radius:12px;box-shadow:var(--shadow-sm)}
+.field input,.field select{border-radius:10px;border-color:#DCE2EC}
+.field input:focus,.field select:focus{box-shadow:0 0 0 3px rgba(0,60,130,.12)}
+.topbar{box-shadow:0 1px 0 rgba(0,0,0,.04)}
+.rtab{border-radius:999px}
+.rtab.active{box-shadow:var(--shadow-sm)}
+.modal{border-radius:18px 18px 0 0}
+.tbl-wrap{border-color:#E8ECF3}
+th{background:#F7F9FC;color:#8A93A0}
+.alert{border-radius:12px}
+.hist-item{border-radius:10px;transition:background .12s ease}
+.badge{border-radius:999px}
+
 </style>
 <script src="https://cdn.jsdelivr.net/npm/@azure/msal-browser@3.30.0/lib/msal-browser.min.js" integrity="sha384-YnOjsoOxSYo65h1BXWnSq24bFbqW8HfzMWSEQxYEMRmjW9Vl1J3HZI3iZxqNYvIi" crossorigin="anonymous"></script>
 </head>
@@ -253,7 +276,7 @@ tr.hi-row td{background:rgba(255,220,2,.06)}
   <button class="sbn" onclick="nav(4)" id="sbn4" data-tab="4"><span class="sb-ic">🕐</span>History</button>
   <div class="sb-group">System</div>
   <button class="sbn" onclick="nav(5)" id="sbn5" data-tab="5"><span class="sb-ic">⚙️</span>Settings</button>
-  <div class="sb-foot">Operations ERP · v4.3</div>
+  <div class="sb-foot">Operations ERP · v4.4</div>
 </div>
 
 <div class="bnav">
@@ -388,6 +411,15 @@ tr.hi-row td{background:rgba(255,220,2,.06)}
     </div>
     <div class="field" style="margin-top:10px"><label>Auto-lock after inactivity (minutes · 0 = off)</label><input type="number" id="s-idleLock" min="0" step="1" onchange="setIdleLock(this.value)"/></div>
   </div>
+  <div class="card" id="adminPinCard">
+    <div class="card-title">🛡️ Admin Approval PIN</div>
+    <div id="adminPinStatus" class="alert alert-b" style="margin-bottom:10px;font-size:12px">—</div>
+    <p style="font-size:11px;color:var(--text3);margin-bottom:8px">Required to approve an Operator's correction to a submitted entry. Separate from the app-open PIN — keep it with admins only.</p>
+    <div style="display:flex;gap:8px;flex-wrap:wrap">
+      <button class="btn btn-blue btn-sm" style="width:auto;padding:10px 18px" onclick="setAdminPin()">Set / Change Approval PIN</button>
+      <button class="btn btn-outline btn-sm" style="width:auto;padding:10px 18px" onclick="removeAdminPin()">Remove</button>
+    </div>
+  </div>
   <div class="card" id="userMgmtCard">
     <div class="card-title">👥 User Management</div>
     <p style="font-size:12px;color:var(--text2);margin-bottom:12px">Assign roles by Microsoft account email. Admins see all tabs including Settings; everyone else is Staff. Add yourself as admin first.</p>
@@ -407,7 +439,7 @@ tr.hi-row td{background:rgba(255,220,2,.06)}
     <div class="vrow"><span class="vl">Signed in as</span><span class="vv info" id="s-loggedIn">—</span></div>
     <div class="vrow"><span class="vl">Total entries</span><span class="vv info" id="s-count">—</span></div>
     <div class="vrow"><span class="vl">Last entry</span><span class="vv" id="s-last">—</span></div>
-    <div class="vrow"><span class="vl">Version</span><span class="vv muted">4.3 · Sep 2026</span></div>
+    <div class="vrow"><span class="vl">Version</span><span class="vv muted">4.4 · Sep 2026</span></div>
   </div>
 </div>
 
@@ -423,7 +455,8 @@ var SK = 'dp_ops_v3', SS = 'dp_settings_v2';
 var DEF_SETTINGS = {
   rates: {pSell:111.74, pBuy:107.65, pCost:107.65, dSell:98.45, dBuy:95.86, dCost:95.86},
   baseline: {p1:58329.09,p2:543.03,p3:385938.94,p4:1580868.60,
-             d1:1369310.85,d2:1019966.13,d3:96899.56,d4:17115.81}
+             d1:1369310.85,d2:1019966.13,d3:96899.56,d4:17115.81},
+  expenseDepts: ['OFFICE','SALARY','MAINTENANCE','OTHER']
 };
 
 var settings = JSON.parse(JSON.stringify(DEF_SETTINGS));
@@ -449,6 +482,15 @@ function saveSettings(){
   if(typeof spSync!=='undefined'&&spSync.active) spSync.schedulePush();
 }
 
+// Persist settings as-is (no DOM read) + editable expense types (departments).
+function persistSettings(){
+  try{ localStorage.setItem(SS,JSON.stringify(settings)); }catch(e){}
+  if(typeof spSync!=='undefined'&&spSync.active) spSync.schedulePush();
+}
+function getDepts(){
+  if(!Array.isArray(settings.expenseDepts) || !settings.expenseDepts.length){ settings.expenseDepts=['OFFICE','SALARY','MAINTENANCE','OTHER']; }
+  return settings.expenseDepts;
+}
 // ── Historic data now lives in dolly_ops_data.json on SharePoint ──
 function seedHistoric(){}
 
@@ -633,8 +675,9 @@ function renderLockedEntry(e){
     '<div style="font-size:38px">✅</div>'+
     '<div style="font-size:16px;font-weight:800;margin:8px 0 4px">Today\'s entry is complete</div>'+
     '<div style="font-size:13px;color:var(--text3)">'+fmtDate(e.date)+' · HSD '+fL(e.dSold)+' · MS '+fL(e.pSold)+' · '+inr(e.totalRev)+'</div>'+
-    '<div style="font-size:12px;color:var(--text3);margin-top:12px">Data entry is once per day. '+(canEdit()?'To correct it, open <b>History → '+fmtDate(e.date)+'</b>.':'To change it, ask Aamir or Saif.')+'</div>'+
-    '<button class="btn btn-outline" style="margin-top:14px" onclick="nav(1)">View today\'s summary</button></div>';
+    '<div style="font-size:12px;color:var(--text3);margin-top:12px">Data entry is once per day. '+(canEdit()?'To correct it, open <b>History → '+fmtDate(e.date)+'</b>.':'Made a mistake? Use the button below — an admin approves the fix with the PIN.')+'</div>'+
+    (canEdit()?'':'<button class="btn btn-outline" style="margin-top:10px" onclick="openEditEntry(\''+e.date+'\')">✏️ Correct a mistake (needs admin PIN)</button>')+
+    '<button class="btn btn-outline" style="margin-top:10px" onclick="nav(1)">View today\'s summary</button></div>';
 }
 function renderEntry(){
   renderStepBar();
@@ -669,14 +712,14 @@ function entryChecklist(e){
     ['Reporter selected', !!e.reporter],
     ['Opening MS nozzles', _has(e.p3o)||_has(e.p4o)],
     ['Opening HSD nozzles', _has(e.d1o)||_has(e.d2o)||_has(e.d3o)||_has(e.d4o)],
-    ['Closing MS nozzles', _has(e.p3c)||_has(e.p4c)],
-    ['Closing HSD nozzles', _has(e.d1c)||_has(e.d2c)||_has(e.d3c)||_has(e.d4c)],
+    ['Closing MS nozzles', _has(e.p3)||_has(e.p4)],
+    ['Closing HSD nozzles', _has(e.d1)||_has(e.d2)||_has(e.d3)||_has(e.d4)],
     ['MS morning stock', _has(e.pAutoAM)&&_has(e.pAM)],
     ['HSD morning stock', _has(e.dAutoAM)&&_has(e.dAM)],
     ['MS evening stock', _has(e.pAutoPM)&&_has(e.pPM)],
     ['HSD evening stock', _has(e.dAutoPM)&&_has(e.dPM)],
-    ['HSD sold plausible', e.dSold>=0 && e.dSold<50000],
-    ['MS sold plausible', e.pSold>=0 && e.pSold<50000],
+    ['HSD sold plausible', e.dSold>=0 && e.dSold<=20000],
+    ['MS sold plausible', e.pSold>=0 && e.pSold<=15000],
     ['Collections recorded', ((e.cash||0)+(e.upi||0)+(e.swipe||0)+(e.fleet||0))>0],
     ['Cash sent to office', _has(e.cashToOffice)],
     ['No negative values', !entryHasNegative(e)],
@@ -765,8 +808,11 @@ function healthCheck(){
 
 function entryDateBounds(){
   var today=todayStr();
-  // Operators: only the current running month. Admins: full FY 2026-27 (for corrections). No future dates for anyone.
-  var min=(typeof isAdmin==='function'&&isAdmin()) ? '2026-04-01' : today.slice(0,7)+'-01';
+  var fyStart='2026-04-01';
+  // Admins: full FY 2026-27. Supervisors/operators: rolling 7-day backlog window; older dates need an admin.
+  var min;
+  if(typeof isAdmin==='function'&&isAdmin()){ min=fyStart; }
+  else { var d=new Date(); d.setDate(d.getDate()-7); var wk=localISO(d); min=(wk<fyStart?fyStart:wk); }
   return {min:min, max:today};
 }
 function validateEntryDate(d){
@@ -775,7 +821,7 @@ function validateEntryDate(d){
   var dt=parseLocal(d);
   if(isNaN(dt.getTime())||localISO(dt)!==d) return {ok:false,msg:'Enter a valid calendar date.'};
   if(d>b.max) return {ok:false,msg:'Future dates are not allowed.'};
-  if(d<b.min) return {ok:false,msg:adm?'Date is outside FY 2026-27 (starts 01-Apr-2026).':'You can only enter dates in the current month. Ask an admin for earlier corrections.'};
+  if(d<b.min) return {ok:false,msg:adm?'Date is outside FY 2026-27 (starts 01-Apr-2026).':'Supervisors can back-date up to 7 days. For older dates, ask an admin.'};
   return {ok:true};
 }
 function stepDate(){
@@ -1004,8 +1050,12 @@ function stepExpenses(){
     '<div class="card"><div class="card-title">+ Add Expense</div>'+
     '<div class="field"><label>Description</label><input type="text" id="exp-name" placeholder="e.g. Tanker bhatta"/></div>'+
     '<div class="grid2">'+
-    '<div class="field"><label>Amount (₹)</label><input type="number" id="exp-amt" placeholder="0"/></div>'+
-    '<div class="field"><label>Type</label><select id="exp-dept"><option>OFFICE</option><option>SALARY</option><option>MAINTENANCE</option><option>OTHER</option></select></div>'+
+    '<div class="field"><label>Amount (₹)</label><input type="number" min="0" id="exp-amt" placeholder="0"/></div>'+
+    '<div class="field"><label>Type</label><select id="exp-dept">'+getDepts().map(function(d){ return '<option>'+escHtml(d)+'</option>'; }).join('')+'</select></div>'+
+    '</div>'+
+    '<div style="display:flex;gap:8px;margin:2px 0 10px">'+
+    '<button class="btn btn-outline btn-sm" style="width:auto;padding:7px 12px" onclick="addDept()">＋ New type</button>'+
+    '<button class="btn btn-outline btn-sm" style="width:auto;padding:7px 12px" onclick="manageDepts()">✎ Manage types</button>'+
     '</div>'+
     '<button class="btn btn-outline" onclick="addExp()">+ Add</button></div>'+
     '<div style="display:flex;gap:8px">'+
@@ -1023,6 +1073,26 @@ function addExp(){
   renderEntry();
 }
 function delExp(i){ draft.expenses.splice(i,1); renderEntry(); }
+function addDept(){
+  var n=prompt('New expense type name:'); if(n==null) return;
+  n=n.trim().toUpperCase(); if(!n){ showToast('Enter a name'); return; }
+  var d=getDepts();
+  if(d.indexOf(n)>=0){ showToast('“'+n+'” already exists'); }
+  else { d.push(n); persistSettings(); showToast('✓ Added '+n); }
+  renderEntry();
+  var sel=document.getElementById('exp-dept'); if(sel) sel.value=n;
+}
+function manageDepts(){
+  var d=getDepts();
+  var pick=prompt('Expense types:\n\n'+d.join(', ')+'\n\nType the one to rename or delete:'); if(pick==null) return;
+  pick=pick.trim().toUpperCase(); var idx=d.indexOf(pick);
+  if(idx<0){ showToast('No type named “'+pick+'”'); return; }
+  var nn=prompt('Rename “'+pick+'” to a new name.\n\nLeave blank to DELETE it.', pick); if(nn==null) return;
+  nn=nn.trim().toUpperCase();
+  if(!nn){ if(confirm('Delete expense type “'+pick+'”?')){ d.splice(idx,1); if(!d.length) d.push('OTHER'); persistSettings(); showToast('✓ Deleted '+pick); } }
+  else if(nn!==pick){ if(d.indexOf(nn)>=0){ showToast('“'+nn+'” already exists'); return; } d[idx]=nn; persistSettings(); showToast('✓ Renamed to '+nn); }
+  renderEntry();
+}
 
 function stepReview(){
   var e=JSON.parse(JSON.stringify(draft));
@@ -1143,7 +1213,9 @@ function renderToday(){
       '<button class="btn btn-blue" onclick="nav(0)">✏️ Fill Today\'s Entry</button>';
     return;
   }
-  el.innerHTML = dayDetailHTML(e);
+  el.innerHTML = dayDetailHTML(e) + (canEdit()?'':(
+    '<button class="btn btn-outline" style="margin-top:12px" onclick="openEditEntry(\''+e.date+'\')">✏️ Correct a mistake (needs admin PIN)</button>'+
+    '<p style="font-size:11px;color:var(--text3);text-align:center;margin-top:8px">Fix the values, then an admin enters the approval PIN to save.</p>'));
 }
 
 function dayDetailHTML(e){
@@ -2377,7 +2449,8 @@ function showDetail(date){
        (e.type==='daily'?'<button class="btn btn-outline" style="flex:1" onclick="loadForEdit(\''+e.date+'\')">🔢 Edit via nozzles</button>':'')+
        '</div>'+
        '<button class="btn" style="background:#dc2626;color:#fff;margin-top:8px" onclick="deleteEntry(\''+e.date+'\')">🗑 Delete this entry</button>')
-      : '<p style="font-size:12px;color:var(--text3);text-align:center;margin-top:14px">🔒 Editing is restricted to Aamir &amp; Saif.</p>');
+      : ('<button class="btn btn-outline" style="margin-top:12px" onclick="openEditEntry(\''+e.date+'\')">✏️ Correct a mistake (needs admin PIN)</button>'+
+         '<p style="font-size:11px;color:var(--text3);text-align:center;margin-top:8px">Fix the values, then an admin enters the approval PIN to save. Every change is logged.</p>'));
   document.getElementById('detailModal').classList.remove('hidden');
 }
 
@@ -2399,7 +2472,7 @@ function deleteEntry(date){
 
 // ── Universal value editor (works for daily AND imported entries) ──
 function openEditEntry(date){
-  if(!requireEdit()) return;
+  if(!canEdit() && !settings.adminPinHash){ showToast('🔒 Operator corrections need an admin approval PIN (set it in Settings)'); return; }
   var e=entries.find(function(x){ return x.date===date; });
   if(!e) return;
   draft=JSON.parse(JSON.stringify(e));
@@ -2434,8 +2507,8 @@ function readEditExps(){
     if(n) x.name=n.value; if(a) x.amount=parseFloat(a.value)||0;
   });
 }
-function saveEditEntry(date){
-  if(!requireEdit()) return;
+async function saveEditEntry(date){
+  var _needAppr=!canEdit();
   var e=entries.find(function(x){ return x.date===date; }); if(!e) return;
   readEditExps();
   function g(id){ var el=document.getElementById('ed-'+id); var v=el?parseFloat(el.value):NaN; return isNaN(v)?0:v; }
@@ -2451,6 +2524,8 @@ function saveEditEntry(date){
   if(!changes.length){ showToast('No changes to save'); return; }
   var reason=prompt('You are correcting a submitted entry ('+fmtDate(date)+'). Enter a reason (required):','');
   if(reason===null || reason.trim()===''){ showToast('Edit cancelled — a reason is required'); return; }
+  var _approver='self (admin)';
+  if(_needAppr){ var _ok=await adminApprove(); if(!_ok) return; _approver='admin PIN'; }
   e.dSold=nv.dSold; e.dSell=nv.dSell; e.dCost=nv.dCost; e.dBuy=nv.dCost;
   e.pSold=nv.pSold; e.pSell=nv.pSell; e.pCost=nv.pCost; e.pBuy=nv.pCost;
   e.cash=nv.cash; e.upi=nv.upi; e.swipe=nv.swipe; e.fleet=nv.fleet;
@@ -2462,7 +2537,7 @@ function saveEditEntry(date){
   e.totalExp=newExpTot;
   e.netProfit=e.totalMargin-e.totalExp;
   e.savedAt=new Date().toISOString();
-  e.editLog=(e.editLog||[]).concat([{at:new Date().toISOString(), by:(typeof currentDisplayName!=='undefined'&&currentDisplayName)||'unknown', reason:reason.trim(), changes:changes, via:'value editor'}]);
+  e.editLog=(e.editLog||[]).concat([{at:new Date().toISOString(), by:(typeof currentDisplayName!=='undefined'&&currentDisplayName)||'unknown', reason:reason.trim(), changes:changes, via:'value editor', approvedBy:_approver}]);
   try{ e.reportText=reportText(date); }catch(err){}
   try{ e.reportHtml=reportHtml(date); }catch(err){}
   try{ var _dl=getDeleted(); if(_dl.indexOf(date)>=0){ saveDeleted(_dl.filter(function(x){ return x!==date; })); } }catch(err){}
@@ -2604,6 +2679,8 @@ function renderSettings(){
   if(pinCard) pinCard.style.display=(currentRole==='admin')?'':'none';
   var pinStat=document.getElementById('pinStatus');
   if(pinStat){ pinStat.className='alert '+(settings.pinHash?'alert-g':'alert-b'); pinStat.textContent=settings.pinHash?'✓ PIN lock is ON — required on each open':'PIN lock is OFF — set a PIN to enable'; }
+  var apStat=document.getElementById('adminPinStatus');
+  if(apStat){ apStat.className='alert '+(settings.adminPinHash?'alert-g':'alert-a'); apStat.textContent=settings.adminPinHash?'✓ Approval PIN is set — operators can submit corrections for admin approval':'Not set — operators cannot submit corrections until an admin sets this'; }
   var idle=document.getElementById('s-idleLock'); if(idle) idle.value=settings.idleLockMin||0;
   var salCard=document.getElementById('salariesCard'); if(salCard) salCard.style.display=(currentRole==='admin')?'':'none';
   if(currentRole==='admin') renderSalaries();
@@ -3186,7 +3263,7 @@ var spSync = {
         try{
           var _bd=todayStr();
           if(localStorage.getItem('dp_lastbackup')!==_bd){
-            fetch('https://graph.microsoft.com/v1.0/sites/'+sid+'/drive/root:/Operations/Reporting/Backups/dolly_ops_'+_bd+'.json:/content',
+            fetch('https://graph.microsoft.com/v1.0/sites/'+sid+'/drive/root:/Operations/Reporting/Backups/dolly_ops'+DP_ENV_SUFFIX+'_'+_bd+'.json:/content',
               {method:'PUT', headers:{'Authorization':'Bearer '+tok,'Content-Type':'application/json'}, body: payload})
               .then(function(r){ if(r.ok){ try{ localStorage.setItem('dp_lastbackup',_bd); }catch(e){} } }).catch(function(){});
           }
@@ -3223,7 +3300,18 @@ var AAD_CLIENT_ID='218ae300-7a39-48f1-ad89-bbadca020b29';
 var AAD_TENANT='e9538cc7-6ab4-4ffd-a772-2eaa1fdaa2e2';
 var GRAPH_SITE_HOST='oregenesis.sharepoint.com';
 var GRAPH_SITE_PATH='/sites/dolly';
-var GRAPH_FILE_PATH='Operations/Reporting/dolly_ops_data.json';
+// ── Environment isolation ── dev/test read & write their OWN SharePoint file so testing
+// never touches production data. Environment is detected from the hostname.
+function dpEnv(){
+  var h=(location.hostname||'').toLowerCase(), p=location.protocol;
+  if(p==='file:'||h==='localhost'||h==='127.0.0.1'||h.indexOf('dev.')===0||h.indexOf('-dev.')>-1) return 'dev';
+  if(h.indexOf('test.')===0||h.indexOf('-test.')>-1||h.indexOf('staging')>-1) return 'test';
+  return 'prod';
+}
+var DP_ENV=dpEnv();
+var DP_ENV_SUFFIX=(DP_ENV==='prod'?'':'_'+DP_ENV);
+var GRAPH_FILE_PATH='Operations/Reporting/dolly_ops_data'+DP_ENV_SUFFIX+'.json';
+if(DP_ENV!=='prod'){ try{ document.addEventListener('DOMContentLoaded',function(){ var b=document.createElement('div'); b.textContent=DP_ENV.toUpperCase()+' · not production'; b.style.cssText='position:fixed;bottom:74px;right:8px;z-index:9999;background:'+(DP_ENV==='dev'?'#7c3aed':'#b45309')+';color:#fff;font:700 10px/1.5 sans-serif;padding:3px 9px;border-radius:8px;opacity:.92;box-shadow:0 2px 8px rgba(0,0,0,.25)'; document.body.appendChild(b); }); }catch(e){} }
 var GRAPH_SCOPES=['User.Read','Files.ReadWrite.All'];
 
 var SK_USERS='dp_users_v4';
@@ -3410,6 +3498,30 @@ function removePin(){
 }
 function setIdleLock(v){ settings.idleLockMin=parseInt(v,10)||0; try{ localStorage.setItem(SS,JSON.stringify(settings)); }catch(e){} if(typeof spSync!=='undefined'&&spSync.active) spSync.schedulePush(); resetIdle(); }
 function lockNow(){ if(!settings.pinHash){ showToast('Set a PIN first'); return; } appUnlocked=false; showPinLock(); }
+// ── Admin approval PIN — a separate admin-only secret used to authorise an operator's correction ──
+async function setAdminPin(){
+  if(!isAdmin()){ showToast('🔒 Only an admin can set the approval PIN'); return; }
+  var p1=prompt('Set a new ADMIN APPROVAL PIN (4–6 digits).\nSeparate from the app-open PIN — keep it with admins only:'); if(p1==null) return;
+  p1=(p1||'').trim(); if(!/^\d{4,6}$/.test(p1)){ showToast('PIN must be 4–6 digits'); return; }
+  var p2=prompt('Re-enter the approval PIN to confirm:'); if(p2==null) return;
+  if(p1!==(p2||'').trim()){ showToast('PINs did not match'); return; }
+  settings.adminPinHash=await sha256hex(p1);
+  persistSettings(); renderSettings(); showToast('✓ Admin approval PIN set');
+}
+function removeAdminPin(){
+  if(!isAdmin()){ showToast('🔒 Only an admin can change this'); return; }
+  if(!settings.adminPinHash){ showToast('No approval PIN set'); return; }
+  if(!confirm('Remove the admin approval PIN? Operators will not be able to submit corrections until a new one is set.')) return;
+  settings.adminPinHash=''; persistSettings(); renderSettings(); showToast('✓ Admin approval PIN removed');
+}
+// Prompt for the admin approval PIN; resolves true only on a match. Used to authorise operator edits.
+async function adminApprove(){
+  if(!settings.adminPinHash){ showToast('🔒 No admin approval PIN is set — ask an admin to set one in Settings'); return false; }
+  var p=prompt('ADMIN APPROVAL required to save this correction.\nAsk an admin to enter the approval PIN:'); if(p==null) return false;
+  var h=await sha256hex((p||'').trim());
+  if(h===settings.adminPinHash) return true;
+  showToast('❌ Wrong admin PIN — correction not approved'); return false;
+}
 
 async function initAuth(){
   if(AAD_CLIENT_ID.indexOf('__')===0){
