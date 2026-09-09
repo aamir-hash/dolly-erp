@@ -6,7 +6,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes"/>
 <meta name="apple-mobile-web-app-title" content="Dolly Ops"/>
 <title>Dolly Petroleum — Operations</title>
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' data: https://fonts.gstatic.com; img-src 'self' data: blob:; connect-src 'self' https://graph.microsoft.com https://login.microsoftonline.com https://*.sharepoint.com https://cdn.jsdelivr.net https://cdnjs.cloudflare.com; frame-src 'self' https://login.microsoftonline.com; worker-src 'self' blob: https://cdnjs.cloudflare.com; object-src 'none'; base-uri 'self'"/>
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' data: https://fonts.gstatic.com; img-src 'self' data: blob:; connect-src 'self' https://graph.microsoft.com https://login.microsoftonline.com https://*.sharepoint.com https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://*.workers.dev; frame-src 'self' https://login.microsoftonline.com; worker-src 'self' blob: https://cdnjs.cloudflare.com; object-src 'none'; base-uri 'self'"/>
 <link href="https://fonts.googleapis.com/css2?family=Public+Sans:wght@400;500;600;700;800;900&display=swap" rel="stylesheet"/>
 <style>
 *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
@@ -255,7 +255,7 @@ tr.hi-row td{background:rgba(255,220,2,.06)}
   <button class="sbn" onclick="nav(4)" id="sbn4" data-tab="4"><span class="sb-ic">🕐</span>History</button>
   <div class="sb-group">System</div>
   <button class="sbn" onclick="nav(5)" id="sbn5" data-tab="5"><span class="sb-ic">⚙️</span>Settings</button>
-  <div class="sb-foot">Operations ERP · v5.1</div>
+  <div class="sb-foot">Operations ERP · v5.3</div>
 </div>
 
 <div class="bnav">
@@ -407,12 +407,22 @@ tr.hi-row td{background:rgba(255,220,2,.06)}
     <div class="vrow"><span class="vl">Signed in as</span><span class="vv info" id="s-loggedIn">—</span></div>
     <div class="vrow"><span class="vl">Total entries</span><span class="vv info" id="s-count">—</span></div>
     <div class="vrow"><span class="vl">Last entry</span><span class="vv" id="s-last">—</span></div>
-    <div class="vrow"><span class="vl">Version</span><span class="vv muted">5.1 · Sep 2026</span></div>
+    <div class="vrow"><span class="vl">Version</span><span class="vv muted">5.3 · Sep 2026</span></div>
   </div>
   <div class="card" id="priceLogCard">
     <div class="card-title">🏷️ Price change history</div>
     <p style="font-size:11px;color:var(--text3);margin:2px 0 8px">Every change to the rates above is logged here with the date — replaces the sheet's price-fluctuation tab.</p>
     <div id="priceLogBody"></div>
+  </div>
+  <div class="card" id="aiCard">
+    <div class="card-title">🤖 AI Assistant</div>
+    <p style="font-size:11px;color:var(--text3);margin:2px 0 10px">Connect the Claude proxy (Cloudflare Worker) so the app can suggest name matches and explain reconciliation differences. Setup guide: Dolly_AI_Proxy/RUNBOOK. The API key stays on the Worker, never in the app.</p>
+    <div class="field"><label>Proxy URL</label><input type="text" id="s-aiurl" placeholder="https://dolly-ai.xxx.workers.dev" oninput="saveAISettings()"/></div>
+    <div class="grid2">
+      <div class="field"><label>Shared key (optional)</label><input type="text" id="s-aikey" placeholder="matches DOLLY_SHARED_KEY" oninput="saveAISettings()"/></div>
+      <div class="field"><label>Model</label><input type="text" id="s-aimodel" placeholder="claude-sonnet-4-5" oninput="saveAISettings()"/></div>
+    </div>
+    <button class="btn btn-outline btn-sm" style="width:auto;padding:8px 16px" onclick="testAI()">Test connection</button>
   </div>
 </div>
 
@@ -426,6 +436,9 @@ tr.hi-row td{background:rgba(255,220,2,.06)}
   <div class="card"><div class="card-title">💼 Employee Master</div>
     <p style="font-size:11px;color:var(--text3);margin:2px 0 10px">Each employee is a creditor: salary accrues monthly (credit), cash paid from daily SALARY expenses is the debit. 📄 opens the month-by-month statement · 📎/🪪 uploads/views the Aadhaar card.</p>
     <div id="salariesBody"></div>
+  </div>
+  <div class="card"><div class="card-title">🗓️ Attendance</div>
+    <div id="attBody"></div>
   </div>
 </div>
 
@@ -616,7 +629,7 @@ function nav(i){
   if(i===4) renderHistory();
   if(i===5) renderSettings();
   if(i===6) renderLubricants();
-  if(i===7) renderSalaries();
+  if(i===7){ renderSalaries(); renderAttendance(); }
   var subs=['Daily Entry','Today\'s Summary','Reports','Parties','History','Settings','Lubricants'];
   subs[7]='Salaries';
   document.getElementById('topSub').textContent=subs[i]||'';
@@ -1866,7 +1879,7 @@ function renderBpclResult(d){
   box.innerHTML=summary+table+applyBtn+'<div id="applyPanel" style="margin-top:12px"></div><p style="font-size:12px;color:var(--text3);margin-top:10px">Read-only until you press Apply. Applying stores a dated reconciliation record + the BPCL closing balance and cross-checks invoices against ERP purchases — it does <b>not</b> change any party ledger.</p>';
 }
 
-/* BUILD:rpc-redesign-v43-salaryattribution */
+/* BUILD:rpc-redesign-v45-aiplugin */
 // Parse a Union Bank of India "Statement of Account" PDF (deposit/withdrawal by balance movement)
 function parseBankLines(lines){
   var out={period:'', opening:null, closing:null, rows:[],
@@ -2394,6 +2407,7 @@ function renderMonthlyClose(){
   box.innerHTML='<div class="rtabs" style="margin-bottom:12px">'+msel+'</div>'+
     '<div class="hero"><h2>Monthly Close — '+mn+'</h2><p>Reconciliation checklist across every head</p></div>'+
     '<div class="alert '+banner.cls+'" style="margin-bottom:12px">'+banner.txt+'</div>'+
+    (aiCfg().url?'<button class="btn btn-outline btn-sm" style="width:auto;padding:8px 14px;margin-bottom:12px" onclick="aiExplainClose()">🤖 Explain differences</button>':'')+
     '<div class="card"><div class="tbl-wrap"><table style="width:100%;border-collapse:collapse"><thead><tr><th style="width:34px"></th><th>Check</th><th>Detail</th></tr></thead><tbody>'+rows+'</tbody></table></div>'+
     '<p style="font-size:11px;color:var(--text3);margin-top:8px">✓ reconciled · ⚠ needs attention · — statement not applied · · informational. Apply the month\'s bank &amp; BPCL statements (Reconcile tab) to turn the — checks green.</p></div>';
 }
@@ -2646,7 +2660,7 @@ function renderSalaries(){
   var table=staff.length?('<div class="tbl-wrap"><table style="width:100%;border-collapse:collapse"><thead><tr><th>Post</th><th>Name</th><th>Mobile</th><th class="r">Monthly ₹</th><th class="r">Accrued</th><th class="r">Paid</th><th class="r">Balance</th><th></th></tr></thead><tbody>'+rows+
     '<tr style="font-weight:700;border-top:2px solid var(--border)"><td colspan="3">Total ('+staff.length+' staff)</td><td class="r">'+inr(totSal)+'</td><td></td><td></td><td class="r">'+inr(totBal)+'</td><td></td></tr></tbody></table></div>'):
     '<p style="color:var(--text3);padding:10px 0">No staff added yet.</p>';
-  var umNote=um>0?'<p style="font-size:11px;color:#b26a00;margin-top:6px">⚠ '+inr(um)+' of SALARY expenses don\'t match any staff name — add the staff, or fix the expense name, so it\'s tracked here.</p>':'';
+  var umNote=um>0?'<p style="font-size:11px;color:#b26a00;margin-top:6px">⚠ '+inr(um)+' of SALARY expenses don\'t match any staff name — add the staff, or fix the expense name, so it\'s tracked here. '+(aiCfg().url?'<button class="btn btn-outline btn-sm" style="width:auto;padding:4px 10px;margin-left:6px;font-size:11px" onclick="aiSuggestMatches()">🤖 Suggest matches</button>':'')+'</p>':'';
   var form=admin?('<div style="margin-top:12px;padding-top:10px;border-top:1px solid var(--border)"><div class="grid2">'+
     '<div class="field"><label>Post</label><input id="st-post" placeholder="e.g. PUMP OPERATOR"/></div>'+
     '<div class="field"><label>Name</label><input id="st-name" placeholder="Full name (must match expense name)"/></div>'+
@@ -2860,6 +2874,72 @@ function deleteLubeSale(id){
   saveLubeSales(getLubeSales().filter(function(s){return s.id!==id;})); showToast('✓ Sale deleted'); renderLubricants(); try{ if(window.spSync&&spSync.push) spSync.push(); }catch(e){}
 }
 
+// ── Attendance (Phase: staff) ─────────────────────────────────────────────
+var SK_ATT='dp_attendance_v1', attDate=null;
+function getAtt(){ try{ var s=localStorage.getItem(SK_ATT); if(s) return JSON.parse(s); }catch(e){} return {}; }
+function saveAtt(o){ try{ localStorage.setItem(SK_ATT, JSON.stringify(o)); }catch(e){} if(typeof spSync!=='undefined'&&spSync.active) spSync.schedulePush(); }
+function setAtt(sid,code){ if(!requireEdit()) return; var d=attDate||todayStr(); var a=getAtt(); a[d]=a[d]||{}; if(a[d][sid]===code) delete a[d][sid]; else a[d][sid]=code; if(!Object.keys(a[d]).length) delete a[d]; saveAtt(a); renderAttendance(); try{ if(window.spSync&&spSync.push) spSync.push(); }catch(e){} }
+function renderAttendance(){
+  var box=document.getElementById('attBody'); if(!box) return;
+  if(!attDate) attDate=todayStr();
+  var a=getAtt(), day=a[attDate]||{}, staff=getStaff();
+  var codes=[['P','#1e7d34'],['H','#b26a00'],['A','#c0392b'],['L','#555']];
+  var canE=canEdit();
+  var rows=staff.map(function(s){
+    var cur=day[s.id]||'';
+    var btns=codes.map(function(c){ var on=cur===c[0]; return '<button '+(canE?'onclick="setAtt(\''+s.id+'\',\''+c[0]+'\')"':'disabled')+' style="border:1px solid '+c[1]+';background:'+(on?c[1]:'transparent')+';color:'+(on?'#fff':c[1])+';border-radius:6px;padding:4px 10px;margin-right:4px;cursor:pointer;font-size:12px;font-weight:700">'+c[0]+'</button>'; }).join('');
+    return '<tr><td>'+escHtml(s.name)+'</td><td>'+btns+'</td></tr>';
+  }).join('');
+  var ym=attDate.slice(0,7), summ={};
+  Object.keys(a).forEach(function(dt){ if(dt.slice(0,7)!==ym) return; Object.keys(a[dt]).forEach(function(sid){ var c=a[dt][sid]; summ[sid]=summ[sid]||{P:0,H:0,A:0,L:0}; if(summ[sid][c]!=null) summ[sid][c]++; }); });
+  var sumRows=staff.map(function(s){ var q=summ[s.id]||{P:0,H:0,A:0,L:0}; var days=q.P+q.H*0.5; return '<tr><td>'+escHtml(s.name)+'</td><td class="r">'+q.P+'</td><td class="r">'+q.H+'</td><td class="r">'+q.A+'</td><td class="r">'+q.L+'</td><td class="r"><b>'+days+'</b></td></tr>'; }).join('');
+  box.innerHTML='<div class="field" style="max-width:220px"><label>Date</label><input type="date" id="att-date" value="'+attDate+'" max="'+todayStr()+'" onchange="attDate=this.value;renderAttendance()"/></div>'+
+    '<div class="tbl-wrap"><table style="width:100%"><thead><tr><th>Employee</th><th>Mark (P/H/A/L)</th></tr></thead><tbody>'+(rows||'<tr><td colspan="2" style="color:var(--text3)">No employees</td></tr>')+'</tbody></table></div>'+
+    '<div class="card-title" style="font-size:14px;margin-top:14px">Summary — '+new Date(ym+'-01').toLocaleDateString('en-IN',{month:'long',year:'numeric'})+'</div>'+
+    '<div class="tbl-wrap"><table style="width:100%"><thead><tr><th>Employee</th><th class="r">P</th><th class="r">H</th><th class="r">A</th><th class="r">L</th><th class="r">Days</th></tr></thead><tbody>'+sumRows+'</tbody></table></div>'+
+    '<p style="font-size:11px;color:var(--text3);margin-top:6px">P Present · H Half-day · A Absent · L Leave. Days = P + ½·H. Tap a mark again to clear it.</p>';
+}
+
+// ── AI assistant (calls the Cloudflare Worker proxy that holds the Anthropic key) ──
+function aiCfg(){ return {url:(settings.aiProxyUrl||'').trim(), key:(settings.aiKey||'').trim(), model:(settings.aiModel||'').trim()||'claude-sonnet-4-5'}; }
+function askAI(prompt, cb){
+  var c=aiCfg();
+  if(!c.url){ cb('⚠ AI is not set up yet. In Settings → 🤖 AI Assistant, paste your Worker proxy URL (see Dolly_AI_Proxy/RUNBOOK).'); return; }
+  var hdr={'Content-Type':'application/json'}; if(c.key) hdr['X-Dolly-Key']=c.key;
+  fetch(c.url,{method:'POST',headers:hdr,body:JSON.stringify({prompt:prompt,model:c.model})})
+    .then(function(r){ return r.json(); })
+    .then(function(d){ cb(d.text || ('⚠ '+(d.error||'no response from AI'))); })
+    .catch(function(e){ cb('⚠ AI request failed: '+e.message+' (check the proxy URL and that the Worker is deployed).'); });
+}
+function showAIResult(title, text){
+  document.getElementById('detailContent').innerHTML='<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px"><div class="modal-title">'+title+'</div><button onclick="closeModal()" style="background:var(--border);border:none;border-radius:8px;padding:6px 12px;cursor:pointer;font-size:13px">✕</button></div><div style="white-space:pre-wrap;font-size:13px;line-height:1.5">'+escHtml(text)+'</div><p style="font-size:11px;color:var(--text3);margin-top:8px">AI suggestion — review before acting. Nothing is changed automatically.</p>';
+  document.getElementById('detailModal').classList.remove('hidden');
+}
+function testAI(){ showAIResult('🤖 AI test','Testing…'); askAI('Reply with exactly: Dolly AI proxy is working.', function(t){ showAIResult('🤖 AI test', t); }); }
+function aiSuggestMatches(){
+  var staffArr=getStaff(), un=[];
+  entries.forEach(function(e){ if(!e.submitted||(e.date||'')<'2026-04-01') return; (e.expenses||[]).forEach(function(x){ if(_normNm(x.dept).indexOf('SAL')<0) return; if(!staffOf(x,staffArr)) un.push((x.name||'(blank)')+' — ₹'+(Number(x.amount)||0)+' ('+e.date+')'); }); });
+  if(!un.length){ showToast('Nothing unmatched 🎉'); return; }
+  var prompt='You are reconciling a petrol pump payroll. Employees on the master:\n'+staffArr.map(function(s){return '- '+s.name+(s.post?' ('+s.post+')':'');}).join('\n')+'\n\nBelow are salary/advance cash entries whose typed name did NOT match an employee. For each, state the most likely employee it belongs to, or "NOT AN EMPLOYEE" (drivers/outsiders). One concise line per entry, format: "<typed> => <Employee or NOT AN EMPLOYEE>".\n\n'+un.join('\n');
+  showAIResult('🤖 Suggested matches ('+un.length+')','Thinking…');
+  askAI(prompt, function(t){ showAIResult('🤖 Suggested matches ('+un.length+')', t); });
+}
+function aiExplainClose(){
+  var txt=(document.getElementById('reportContent')||{}).innerText||'';
+  if(!txt){ showToast('Open Monthly Close first'); return; }
+  var prompt='This is a petrol pump monthly-close reconciliation checklist. In plain language, explain what is NOT reconciling and the likely cause / what to do. Be concise (bullet points).\n\n'+txt.slice(0,6000);
+  showAIResult('🤖 Monthly Close — explanation','Thinking…');
+  askAI(prompt, function(t){ showAIResult('🤖 Monthly Close — explanation', t); });
+}
+function saveAISettings(){
+  settings.aiProxyUrl=(document.getElementById('s-aiurl')||{}).value||'';
+  settings.aiKey=(document.getElementById('s-aikey')||{}).value||'';
+  settings.aiModel=(document.getElementById('s-aimodel')||{}).value||'';
+  try{ localStorage.setItem(SS,JSON.stringify(settings)); }catch(e){}
+  if(typeof spSync!=='undefined'&&spSync.active) spSync.schedulePush();
+  showToast('✓ AI settings saved');
+}
+
 function renderSettings(){
   var s=settings;
   renderRolePerms();
@@ -2891,6 +2971,10 @@ function renderSettings(){
   if(pinStat){ pinStat.className='alert '+(settings.pinHash?'alert-g':'alert-b'); pinStat.textContent=settings.pinHash?'✓ PIN lock is ON — required on each open':'PIN lock is OFF — set a PIN to enable'; }
   var idle=document.getElementById('s-idleLock'); if(idle) idle.value=settings.idleLockMin||0;
   var plb=document.getElementById('priceLogBody'); if(plb) plb.innerHTML=priceLogHtml();
+  var aiCard=document.getElementById('aiCard'); if(aiCard) aiCard.style.display=(currentRole==='admin')?'':'none';
+  var au=document.getElementById('s-aiurl'); if(au) au.value=settings.aiProxyUrl||'';
+  var ak=document.getElementById('s-aikey'); if(ak) ak.value=settings.aiKey||'';
+  var am=document.getElementById('s-aimodel'); if(am) am.value=settings.aiModel||'';
 }
 
 function exportBackup(){
@@ -3351,6 +3435,7 @@ var spSync = {
       try{ if('partyFuel' in data && data.partyFuel){ localStorage.setItem(SK_PARTYFUEL, JSON.stringify(data.partyFuel)); } }catch(ex){}
       try{ if('staff' in data && data.staff){ localStorage.setItem(SK_STAFF, JSON.stringify(data.staff)); } }catch(ex){}
       try{ if('staffDocs' in data && data.staffDocs){ localStorage.setItem(SK_STAFFDOCS, JSON.stringify(data.staffDocs)); } }catch(ex){}
+      try{ if('attendance' in data && data.attendance){ localStorage.setItem(SK_ATT, JSON.stringify(data.attendance)); } }catch(ex){}
       try{ if('lubes' in data && data.lubes){ localStorage.setItem(SK_LUBES, JSON.stringify(data.lubes)); } }catch(ex){}
       try{ if('lubeSales' in data && data.lubeSales){ localStorage.setItem(SK_LUBESALES, JSON.stringify(data.lubeSales)); } }catch(ex){}
       try{ if('priceLog' in data && data.priceLog){ localStorage.setItem(SK_PRICELOG, JSON.stringify(data.priceLog)); } }catch(ex){}
@@ -3468,6 +3553,7 @@ var spSync = {
         partyFuel: getPartyFuelStore(),
         staff: getStaff(),
         staffDocs: getStaffDocs(),
+        attendance: getAtt(),
         lubes: getLubes(),
         lubeSales: getLubeSales(),
         priceLog: getPriceLog(),
