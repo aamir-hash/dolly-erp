@@ -255,7 +255,7 @@ tr.hi-row td{background:rgba(255,220,2,.06)}
   <button class="sbn" onclick="nav(4)" id="sbn4" data-tab="4"><span class="sb-ic">🕐</span>History</button>
   <div class="sb-group">System</div>
   <button class="sbn" onclick="nav(5)" id="sbn5" data-tab="5"><span class="sb-ic">⚙️</span>Settings</button>
-  <div class="sb-foot">Operations ERP · v5.0</div>
+  <div class="sb-foot">Operations ERP · v5.1</div>
 </div>
 
 <div class="bnav">
@@ -407,7 +407,7 @@ tr.hi-row td{background:rgba(255,220,2,.06)}
     <div class="vrow"><span class="vl">Signed in as</span><span class="vv info" id="s-loggedIn">—</span></div>
     <div class="vrow"><span class="vl">Total entries</span><span class="vv info" id="s-count">—</span></div>
     <div class="vrow"><span class="vl">Last entry</span><span class="vv" id="s-last">—</span></div>
-    <div class="vrow"><span class="vl">Version</span><span class="vv muted">5.0 · Sep 2026</span></div>
+    <div class="vrow"><span class="vl">Version</span><span class="vv muted">5.1 · Sep 2026</span></div>
   </div>
   <div class="card" id="priceLogCard">
     <div class="card-title">🏷️ Price change history</div>
@@ -1029,6 +1029,7 @@ function stepExpenses(){
     '<div class="field"><label>Amount (₹)</label><input type="number" id="exp-amt" placeholder="0"/></div>'+
     '<div class="field"><label>Type</label><select id="exp-dept"><option>OFFICE</option><option>SALARY</option><option>MAINTENANCE</option><option>OTHER</option></select></div>'+
     '</div>'+
+    '<div class="field"><label>Employee (required for SALARY — links it to their ledger)</label><select id="exp-staff"><option value="">— select employee —</option>'+getStaff().map(function(s){ return '<option value="'+s.id+'">'+escHtml(s.name)+'</option>'; }).join('')+'</select></div>'+
     '<button class="btn btn-outline" onclick="addExp()">+ Add</button></div>'+
     '<div style="display:flex;gap:8px">'+
     '<button class="btn btn-outline" style="width:auto;padding:13px 20px" onclick="goStep(5)">← Back</button>'+
@@ -1041,7 +1042,13 @@ function addExp(){
   var dept=document.getElementById('exp-dept')?document.getElementById('exp-dept').value:'OFFICE';
   if(!name||!amt){ showToast('Enter name and amount'); return; }
   if(!draft.expenses) draft.expenses=[];
-  draft.expenses.push({name:name,amount:amt,dept:dept});
+  var exp={name:name,amount:amt,dept:dept};
+  if(dept==='SALARY'){
+    var sel=document.getElementById('exp-staff'); var sid=sel?sel.value:'';
+    if(sid){ var st=getStaff().find(function(p){return p.id===sid;}); exp.staffId=sid; if(st){ exp.staffName=st.name; if(_normNm(name)!==_normNm(st.name)) exp.name=st.name+' — '+name; else exp.name=st.name; } }
+    else if(!confirm('This SALARY payment isn\'t linked to an employee, so it won\'t show on any staff ledger. Add it anyway? (Pick the employee to reconcile it.)')) return;
+  }
+  draft.expenses.push(exp);
   renderEntry();
 }
 function delExp(i){ draft.expenses.splice(i,1); renderEntry(); }
@@ -1859,7 +1866,7 @@ function renderBpclResult(d){
   box.innerHTML=summary+table+applyBtn+'<div id="applyPanel" style="margin-top:12px"></div><p style="font-size:12px;color:var(--text3);margin-top:10px">Read-only until you press Apply. Applying stores a dated reconciliation record + the BPCL closing balance and cross-checks invoices against ERP purchases — it does <b>not</b> change any party ledger.</p>';
 }
 
-/* BUILD:rpc-redesign-v42-employeemaster */
+/* BUILD:rpc-redesign-v43-salaryattribution */
 // Parse a Union Bank of India "Statement of Account" PDF (deposit/withdrawal by balance movement)
 function parseBankLines(lines){
   var out={period:'', opening:null, closing:null, rows:[],
@@ -2589,7 +2596,7 @@ function _normNm(x){ return String(x==null?'':x).trim().toUpperCase(); }
 function _salaryExpenses(sinceYm){
   var out=[];
   entries.forEach(function(e){ if(!e.submitted) return; if(sinceYm && (e.date||'').slice(0,7)<sinceYm) return;
-    (e.expenses||[]).forEach(function(x){ if(_normNm(x.dept).indexOf('SAL')>=0) out.push({date:e.date,name:x.name,amount:Number(x.amount)||0}); }); });
+    (e.expenses||[]).forEach(function(x){ if(_normNm(x.dept).indexOf('SAL')>=0) out.push({date:e.date,name:x.name,amount:Number(x.amount)||0,staffId:x.staffId||null}); }); });
   return out;
 }
 // Match an expense name to exactly ONE staff (bidirectional substring). Returns staff name or null.
@@ -2599,9 +2606,14 @@ function matchStaffName(expName, staffArr){
   var hits=(staffArr||getStaff()).filter(function(s){ var sn=_normNm(s.name); return sn && (nm.indexOf(sn)>=0 || sn.indexOf(nm)>=0); });
   return hits.length===1 ? hits[0].name : null;
 }
+// Resolve a salary expense to a staff NAME — prefer the exact staffId picked at entry time, else name-match.
+function staffOf(x, staffArr){
+  if(x && x.staffId){ var s=(staffArr||getStaff()).find(function(p){ return p.id===x.staffId; }); if(s) return s.name; }
+  return matchStaffName(x&&x.name, staffArr);
+}
 function staffPaid(name, sinceYm){
   var staffArr=getStaff(), key=_normNm(name), total=0;
-  _salaryExpenses(sinceYm).forEach(function(x){ var m=matchStaffName(x.name, staffArr); if(m && _normNm(m)===key) total+=x.amount; });
+  _salaryExpenses(sinceYm).forEach(function(x){ var m=staffOf(x, staffArr); if(m && _normNm(m)===key) total+=x.amount; });
   return Math.round(total);
 }
 function staffAccrued(s){ var cur=todayStr().slice(0,7); return Math.round((Number(s.salary)||0)*monthsInclusive(s.startMonth||cur, cur)); }
@@ -2611,7 +2623,7 @@ function unmatchedSalaryExp(){
   var staffArr=getStaff();
   var since=staffArr.reduce(function(m,s){ var sm=s.startMonth||''; return (sm&&(!m||sm<m))?sm:m; }, '');
   var total=0;
-  _salaryExpenses(since).forEach(function(x){ if(!matchStaffName(x.name, staffArr)) total+=x.amount; });
+  _salaryExpenses(since).forEach(function(x){ if(!staffOf(x, staffArr)) total+=x.amount; });
   return Math.round(total);
 }
 function renderSalaries(){
@@ -2689,7 +2701,7 @@ function showStaffLedger(i){
     if(sal>0) rows.push({date:m+'-01', desc:'Salary — '+new Date(m+'-01').toLocaleDateString('en-IN',{month:'long',year:'numeric'}), credit:sal, debit:0});
     var y=+m.slice(0,4), mo=+m.slice(5,7)+1; if(mo>12){mo=1;y++;} m=y+'-'+('0'+mo).slice(-2);
   }
-  _salaryExpenses(start).forEach(function(x){ if(matchStaffName(x.name,staffArr)===s.name) rows.push({date:x.date, desc:'Cash paid'+((x.name&&_normNm(x.name)!==_normNm(s.name))?' — '+escHtml(x.name):''), credit:0, debit:x.amount}); });
+  _salaryExpenses(start).forEach(function(x){ if(staffOf(x,staffArr)===s.name) rows.push({date:x.date, desc:'Cash paid'+((x.name&&_normNm(x.name)!==_normNm(s.name))?' — '+escHtml(x.name):''), credit:0, debit:x.amount}); });
   rows.sort(function(a,b){ return (a.date||'').localeCompare(b.date||'') || ((b.credit||0)-(a.credit||0)); });
   var run=Number(s.openingBal)||0, tc=0, td=0, trs='';
   if(Math.abs(run)>0.005) trs+='<tr><td>'+fmtDate(start+'-01')+'</td><td>Opening balance</td><td class="r">—</td><td class="r">—</td><td class="r">'+inr(run)+'</td></tr>';
