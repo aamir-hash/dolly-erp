@@ -251,10 +251,11 @@ tr.hi-row td{background:rgba(255,220,2,.06)}
   <div class="sb-group">Money</div>
   <button class="sbn" onclick="nav(3)" id="sbn3" data-tab="3"><span class="sb-ic">🤝</span>Credit Parties</button>
   <button class="sbn" onclick="nav(6)" id="sbn6" data-tab="6"><span class="sb-ic">🛢️</span>Lubricants</button>
+  <button class="sbn" onclick="nav(7)" id="sbn7" data-tab="7"><span class="sb-ic">💼</span>Salaries</button>
   <button class="sbn" onclick="nav(4)" id="sbn4" data-tab="4"><span class="sb-ic">🕐</span>History</button>
   <div class="sb-group">System</div>
   <button class="sbn" onclick="nav(5)" id="sbn5" data-tab="5"><span class="sb-ic">⚙️</span>Settings</button>
-  <div class="sb-foot">Operations ERP · v4.8</div>
+  <div class="sb-foot">Operations ERP · v5.0</div>
 </div>
 
 <div class="bnav">
@@ -262,6 +263,7 @@ tr.hi-row td{background:rgba(255,220,2,.06)}
   <button class="bn" onclick="nav(2)" id="bn2" data-tab="2"><span class="bn-icon">📊</span><span class="bn-label">Reports</span></button>
   <button class="bn" onclick="nav(3)" id="bn3" data-tab="3"><span class="bn-icon">🤝</span><span class="bn-label">Parties</span></button>
   <button class="bn" onclick="nav(6)" id="bn6" data-tab="6"><span class="bn-icon">🛢️</span><span class="bn-label">Lubes</span></button>
+  <button class="bn" onclick="nav(7)" id="bn7" data-tab="7"><span class="bn-icon">💼</span><span class="bn-label">Salary</span></button>
   <button class="bn" onclick="nav(4)" id="bn4" data-tab="4"><span class="bn-icon">🕐</span><span class="bn-label">History</span></button>
   <button class="bn" onclick="nav(5)" id="bn5" data-tab="5"><span class="bn-icon">⚙️</span><span class="bn-label">Settings</span></button>
 </div>
@@ -328,11 +330,6 @@ tr.hi-row td{background:rgba(255,220,2,.06)}
     </div>
     <p style="font-size:11px;color:var(--text3);margin:6px 0 10px">Turn features on/off per role. Only Aamir &amp; Saif (admins) can change this; everyone else is an Operator.</p>
     <div id="rolePermsBody"></div>
-  </div>
-  <div class="card" id="salariesCard">
-    <div class="card-title">💼 Salaries / Payroll</div>
-    <p style="font-size:11px;color:var(--text3);margin:2px 0 10px">Staff master + running balances. Advances/payments are read from daily SALARY expenses (matched by name), so nothing is entered twice. Balance = opening + salary accrued since start − paid.</p>
-    <div id="salariesBody"></div>
   </div>
   <div class="card" id="ratesCard">
     <div class="card-title">📋 Current Rates</div>
@@ -410,7 +407,7 @@ tr.hi-row td{background:rgba(255,220,2,.06)}
     <div class="vrow"><span class="vl">Signed in as</span><span class="vv info" id="s-loggedIn">—</span></div>
     <div class="vrow"><span class="vl">Total entries</span><span class="vv info" id="s-count">—</span></div>
     <div class="vrow"><span class="vl">Last entry</span><span class="vv" id="s-last">—</span></div>
-    <div class="vrow"><span class="vl">Version</span><span class="vv muted">4.8 · Sep 2026</span></div>
+    <div class="vrow"><span class="vl">Version</span><span class="vv muted">5.0 · Sep 2026</span></div>
   </div>
   <div class="card" id="priceLogCard">
     <div class="card-title">🏷️ Price change history</div>
@@ -424,7 +421,16 @@ tr.hi-row td{background:rgba(255,220,2,.06)}
   <div id="lubesBody"></div>
 </div>
 
+<div class="page" id="page7">
+  <div class="hero"><h2>Salaries</h2><p>Staff payroll ledger — earned vs cash paid</p></div>
+  <div class="card"><div class="card-title">💼 Employee Master</div>
+    <p style="font-size:11px;color:var(--text3);margin:2px 0 10px">Each employee is a creditor: salary accrues monthly (credit), cash paid from daily SALARY expenses is the debit. 📄 opens the month-by-month statement · 📎/🪪 uploads/views the Aadhaar card.</p>
+    <div id="salariesBody"></div>
+  </div>
+</div>
+
 <!-- DETAIL MODAL -->
+<input type="file" id="aadhaarInput" accept="image/*,application/pdf" style="display:none" onchange="onAadhaarPicked(event)"/>
 <div class="modal-overlay hidden" id="detailModal" onclick="closeModal(event)">
   <div class="modal" id="detailContent"></div>
 </div>
@@ -610,7 +616,9 @@ function nav(i){
   if(i===4) renderHistory();
   if(i===5) renderSettings();
   if(i===6) renderLubricants();
+  if(i===7) renderSalaries();
   var subs=['Daily Entry','Today\'s Summary','Reports','Parties','History','Settings','Lubricants'];
+  subs[7]='Salaries';
   document.getElementById('topSub').textContent=subs[i]||'';
 }
 function rTab(i,btn){
@@ -1851,7 +1859,7 @@ function renderBpclResult(d){
   box.innerHTML=summary+table+applyBtn+'<div id="applyPanel" style="margin-top:12px"></div><p style="font-size:12px;color:var(--text3);margin-top:10px">Read-only until you press Apply. Applying stores a dated reconciliation record + the BPCL closing balance and cross-checks invoices against ERP purchases — it does <b>not</b> change any party ledger.</p>';
 }
 
-/* BUILD:rpc-redesign-v40-monthlyclose */
+/* BUILD:rpc-redesign-v42-employeemaster */
 // Parse a Union Bank of India "Statement of Account" PDF (deposit/withdrawal by balance movement)
 function parseBankLines(lines){
   var out={period:'', opening:null, closing:null, rows:[],
@@ -2609,29 +2617,35 @@ function unmatchedSalaryExp(){
 function renderSalaries(){
   var box=document.getElementById('salariesBody'); if(!box) return;
   var admin=(currentRole==='admin'); var staff=getStaff();
+  var docs=getStaffDocs();
   var rows=staff.map(function(s,i){
     var paid=staffPaid(s.name,s.startMonth), acc=staffAccrued(s), bal=(Number(s.openingBal)||0)+acc-paid;
     var lbl=bal>0?'owed to staff':(bal<0?'advance / overpaid':'settled');
-    return '<tr><td>'+escHtml(s.post||'')+'</td><td>'+escHtml(s.name||'')+'</td><td>'+escHtml(s.mobile||'')+'</td>'+
+    var hasDoc=!!docs[s.id];
+    var aadBtn='<button title="'+(hasDoc?'View Aadhaar':'Upload Aadhaar')+'" onclick="'+(hasDoc?'viewAadhaar':'uploadAadhaar')+'(\''+s.id+'\')" style="background:none;border:none;cursor:pointer;font-size:14px">'+(hasDoc?'🪪':'📎')+'</button>';
+    return '<tr><td>'+escHtml(s.post||'')+'</td><td>'+escHtml(s.name||'')+(s.aadhaarNo?'<div style="font-size:10px;color:var(--text3)">🆔 '+escHtml(s.aadhaarNo)+'</div>':'')+'</td><td>'+escHtml(s.mobile||'')+'</td>'+
       '<td class="r">'+inr(s.salary||0)+'</td><td class="r">'+inr(acc)+'</td><td class="r">'+inr(paid)+'</td>'+
       '<td class="r '+(bal>0?'warn':'ok')+'">'+inr(bal)+' <span style="font-size:10px;color:var(--text3)">'+lbl+'</span></td>'+
-      (admin?'<td class="c"><button title="Edit" onclick="editStaff('+i+')" style="background:none;border:none;cursor:pointer;color:var(--blue);font-size:14px">✎</button> <button title="Remove" onclick="deleteStaff('+i+')" style="background:none;border:none;cursor:pointer;color:var(--red);font-size:14px">🗑</button></td>':'')+'</tr>';
+      '<td class="c" style="white-space:nowrap"><button title="Statement" onclick="showStaffLedger('+i+')" style="background:none;border:none;cursor:pointer;color:var(--blue);font-size:14px">📄</button> '+aadBtn+(admin?' <button title="Edit" onclick="editStaff('+i+')" style="background:none;border:none;cursor:pointer;color:var(--blue);font-size:14px">✎</button> <button title="Remove" onclick="deleteStaff('+i+')" style="background:none;border:none;cursor:pointer;color:var(--red);font-size:14px">🗑</button>':'')+'</td></tr>';
   }).join('');
   var totSal=staff.reduce(function(t,s){return t+(Number(s.salary)||0);},0);
   var totBal=staff.reduce(function(t,s){return t+staffBalance(s);},0);
   var um=unmatchedSalaryExp();
-  var table=staff.length?('<div class="tbl-wrap"><table style="width:100%;border-collapse:collapse"><thead><tr><th>Post</th><th>Name</th><th>Mobile</th><th class="r">Monthly ₹</th><th class="r">Accrued</th><th class="r">Paid</th><th class="r">Balance</th>'+(admin?'<th></th>':'')+'</tr></thead><tbody>'+rows+
-    '<tr style="font-weight:700;border-top:2px solid var(--border)"><td colspan="3">Total ('+staff.length+' staff)</td><td class="r">'+inr(totSal)+'</td><td></td><td></td><td class="r">'+inr(totBal)+'</td>'+(admin?'<td></td>':'')+'</tr></tbody></table></div>'):
+  var table=staff.length?('<div class="tbl-wrap"><table style="width:100%;border-collapse:collapse"><thead><tr><th>Post</th><th>Name</th><th>Mobile</th><th class="r">Monthly ₹</th><th class="r">Accrued</th><th class="r">Paid</th><th class="r">Balance</th><th></th></tr></thead><tbody>'+rows+
+    '<tr style="font-weight:700;border-top:2px solid var(--border)"><td colspan="3">Total ('+staff.length+' staff)</td><td class="r">'+inr(totSal)+'</td><td></td><td></td><td class="r">'+inr(totBal)+'</td><td></td></tr></tbody></table></div>'):
     '<p style="color:var(--text3);padding:10px 0">No staff added yet.</p>';
   var umNote=um>0?'<p style="font-size:11px;color:#b26a00;margin-top:6px">⚠ '+inr(um)+' of SALARY expenses don\'t match any staff name — add the staff, or fix the expense name, so it\'s tracked here.</p>':'';
   var form=admin?('<div style="margin-top:12px;padding-top:10px;border-top:1px solid var(--border)"><div class="grid2">'+
     '<div class="field"><label>Post</label><input id="st-post" placeholder="e.g. PUMP OPERATOR"/></div>'+
     '<div class="field"><label>Name</label><input id="st-name" placeholder="Full name (must match expense name)"/></div>'+
     '<div class="field"><label>Mobile</label><input id="st-mobile" placeholder="Optional"/></div>'+
+    '<div class="field"><label>Aadhaar No</label><input id="st-aadhaar" placeholder="12-digit (optional)"/></div>'+
+    '<div class="field"><label>Address</label><input id="st-address" placeholder="Optional"/></div>'+
     '<div class="field"><label>Monthly Salary ₹</label><input id="st-salary" type="number" step="1"/></div>'+
     '<div class="field"><label>Opening Balance ₹</label><input id="st-ob" type="number" step="1" value="0"/></div>'+
     '<div class="field"><label>Start Month</label><input id="st-start" placeholder="'+todayStr().slice(0,7)+'"/></div>'+
-    '</div><button class="btn btn-blue btn-sm" style="width:auto;padding:8px 16px" onclick="addStaff()">➕ Add staff</button></div>'):'';
+    '</div><button class="btn btn-blue btn-sm" style="width:auto;padding:8px 16px" onclick="addStaff()">➕ Add employee</button>'+
+    '<p style="font-size:11px;color:var(--text3);margin-top:6px">After adding, use 📎 to upload the employee\'s Aadhaar card.</p></div>'):'';
   box.innerHTML=table+umNote+form;
 }
 function addStaff(){
@@ -2642,8 +2656,8 @@ function addStaff(){
   if(staff.some(function(s){return String(s.name).toLowerCase()===name.toLowerCase();})){ showToast('Staff already exists'); return; }
   var start=((document.getElementById('st-start')||{}).value||'').trim()||todayStr().slice(0,7);
   if(!/^\d{4}-\d{2}$/.test(start)){ showToast('⚠ Start month must be YYYY-MM'); return; }
-  staff.push({id:'st'+Date.now(), name:name, post:((document.getElementById('st-post')||{}).value||'').trim(), mobile:((document.getElementById('st-mobile')||{}).value||'').trim(), salary:parseFloat((document.getElementById('st-salary')||{}).value||0)||0, openingBal:parseFloat((document.getElementById('st-ob')||{}).value||0)||0, startMonth:start, active:true});
-  saveStaff(staff); showToast('✓ Staff added'); renderSalaries();
+  staff.push({id:'st'+Date.now(), name:name, post:((document.getElementById('st-post')||{}).value||'').trim(), mobile:((document.getElementById('st-mobile')||{}).value||'').trim(), aadhaarNo:((document.getElementById('st-aadhaar')||{}).value||'').trim(), address:((document.getElementById('st-address')||{}).value||'').trim(), salary:parseFloat((document.getElementById('st-salary')||{}).value||0)||0, openingBal:parseFloat((document.getElementById('st-ob')||{}).value||0)||0, startMonth:start, active:true});
+  saveStaff(staff); showToast('✓ Employee added'); renderSalaries();
   try{ if(window.spSync&&spSync.push) spSync.push(); }catch(e){}
 }
 function editStaff(i){
@@ -2654,7 +2668,9 @@ function editStaff(i){
   if(!/^\d{4}-\d{2}$/.test(st)){ showToast('⚠ Start month must be YYYY-MM'); return; }
   var post=prompt('Post:', s.post||''); if(post===null) return;
   var mob=prompt('Mobile:', s.mobile||''); if(mob===null) return;
-  s.salary=parseFloat(sal)||0; s.openingBal=parseFloat(ob)||0; s.startMonth=st; s.post=post.trim(); s.mobile=mob.trim();
+  var aad=prompt('Aadhaar No:', s.aadhaarNo||''); if(aad===null) return;
+  var addr=prompt('Address:', s.address||''); if(addr===null) return;
+  s.salary=parseFloat(sal)||0; s.openingBal=parseFloat(ob)||0; s.startMonth=st; s.post=post.trim(); s.mobile=mob.trim(); s.aadhaarNo=aad.trim(); s.address=addr.trim();
   saveStaff(staff); showToast('✓ Updated '+s.name); renderSalaries();
   try{ if(window.spSync&&spSync.push) spSync.push(); }catch(e){}
 }
@@ -2663,6 +2679,66 @@ function deleteStaff(i){
   if(!confirm('Remove '+s.name+' from the staff list? (Daily expenses are unaffected.)')) return;
   staff.splice(i,1); saveStaff(staff); showToast('✓ Removed '+s.name); renderSalaries();
   try{ if(window.spSync&&spSync.push) spSync.push(); }catch(e){}
+}
+// Creditor-style ledger statement for one staff member: monthly salary (credit) vs cash paid (debit), running balance.
+function showStaffLedger(i){
+  var s=getStaff()[i]; if(!s) return;
+  var staffArr=getStaff(), start=s.startMonth||'2026-04', cur=todayStr().slice(0,7), sal=Number(s.salary)||0;
+  var rows=[], m=start;
+  while(m<=cur){
+    if(sal>0) rows.push({date:m+'-01', desc:'Salary — '+new Date(m+'-01').toLocaleDateString('en-IN',{month:'long',year:'numeric'}), credit:sal, debit:0});
+    var y=+m.slice(0,4), mo=+m.slice(5,7)+1; if(mo>12){mo=1;y++;} m=y+'-'+('0'+mo).slice(-2);
+  }
+  _salaryExpenses(start).forEach(function(x){ if(matchStaffName(x.name,staffArr)===s.name) rows.push({date:x.date, desc:'Cash paid'+((x.name&&_normNm(x.name)!==_normNm(s.name))?' — '+escHtml(x.name):''), credit:0, debit:x.amount}); });
+  rows.sort(function(a,b){ return (a.date||'').localeCompare(b.date||'') || ((b.credit||0)-(a.credit||0)); });
+  var run=Number(s.openingBal)||0, tc=0, td=0, trs='';
+  if(Math.abs(run)>0.005) trs+='<tr><td>'+fmtDate(start+'-01')+'</td><td>Opening balance</td><td class="r">—</td><td class="r">—</td><td class="r">'+inr(run)+'</td></tr>';
+  rows.forEach(function(r){ run+=(r.credit||0)-(r.debit||0); tc+=r.credit||0; td+=r.debit||0;
+    trs+='<tr><td style="white-space:nowrap">'+fmtDate(r.date)+'</td><td>'+escHtml(r.desc)+'</td><td class="r">'+(r.debit?inr(r.debit):'—')+'</td><td class="r">'+(r.credit?inr(r.credit):'—')+'</td><td class="r '+(run>=0?'warn':'ok')+'">'+inr(run)+'</td></tr>'; });
+  var bal=run, lbl=bal>0?('Dolly owes '+String(s.name||'').split(' ')[0]):(bal<0?'advance with staff':'settled');
+  document.getElementById('detailContent').innerHTML=
+    '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">'+
+    '<div class="modal-title">💼 '+escHtml(s.name)+' <span style="font-size:12px;color:var(--text3);font-weight:400">'+escHtml(s.post||'')+'</span></div>'+
+    '<button onclick="closeModal()" style="background:var(--border);border:none;border-radius:8px;padding:6px 12px;cursor:pointer;font-size:13px">✕</button></div>'+
+    '<div class="kpi-grid" style="margin-bottom:12px">'+
+    '<div class="kpi '+(bal>0?'r':'g')+'"><div class="kv">'+inr(bal)+'</div><div class="kl">'+lbl+'</div></div>'+
+    '<div class="kpi"><div class="kv">'+inr(tc)+'</div><div class="kl">Salary earned</div></div>'+
+    '<div class="kpi"><div class="kv">'+inr(td)+'</div><div class="kl">Cash paid</div></div>'+
+    '<div class="kpi"><div class="kv">₹'+sal.toLocaleString('en-IN')+'</div><div class="kl">Monthly</div></div></div>'+
+    '<div class="tbl-wrap"><table><thead><tr><th>Date</th><th>Particulars</th><th class="r">Debit (paid)</th><th class="r">Credit (salary)</th><th class="r">Balance</th></tr></thead><tbody>'+
+    (trs||'<tr><td colspan="5" style="text-align:center;color:var(--text3);padding:16px">No entries</td></tr>')+
+    '<tr class="total-row"><td colspan="2"><strong>TOTAL</strong></td><td class="r"><strong>'+inr(td)+'</strong></td><td class="r"><strong>'+inr(tc)+'</strong></td><td class="r"><strong>'+inr(bal)+'</strong></td></tr>'+
+    '</tbody></table></div>'+
+    '<p style="font-size:11px;color:var(--text3);margin-top:8px">Salary accrues monthly (credit); cash paid is pulled from the daily SALARY expenses (debit). Positive balance = Dolly owes the staff.</p>';
+  document.getElementById('detailModal').classList.remove('hidden');
+}
+
+// ── Staff Aadhaar / ID docs (kept in a separate store; images compressed to keep sync light) ──
+var SK_STAFFDOCS='dp_staffdocs_v1';
+function getStaffDocs(){ try{ var s=localStorage.getItem(SK_STAFFDOCS); if(s) return JSON.parse(s); }catch(e){} return {}; }
+function saveStaffDocs(o){ try{ localStorage.setItem(SK_STAFFDOCS, JSON.stringify(o)); }catch(e){} if(typeof spSync!=='undefined'&&spSync.active) spSync.schedulePush(); }
+var _pendingAadhaarStaff=null;
+function uploadAadhaar(id){ if(!requireEdit()) return; _pendingAadhaarStaff=id; var inp=document.getElementById('aadhaarInput'); if(inp){ inp.value=''; inp.click(); } }
+function onAadhaarPicked(ev){
+  var f=ev.target.files && ev.target.files[0]; if(!f||!_pendingAadhaarStaff) return;
+  var id=_pendingAadhaarStaff;
+  function done(doc){ var docs=getStaffDocs(); docs[id]=doc; saveStaffDocs(docs); showToast('✓ Aadhaar saved'); renderSalaries(); try{ if(window.spSync&&spSync.push) spSync.push(); }catch(x){} }
+  if(f.type==='application/pdf'){ var r=new FileReader(); r.onload=function(e){ done({type:'pdf',data:e.target.result,name:f.name}); }; r.readAsDataURL(f); return; }
+  var rd=new FileReader(); rd.onload=function(e){ var img=new Image(); img.onload=function(){
+    var max=1000, w=img.width, h=img.height; if(w>max||h>max){ if(w>=h){ h=Math.round(h*max/w); w=max; } else { w=Math.round(w*max/h); h=max; } }
+    var cv=document.createElement('canvas'); cv.width=w; cv.height=h; cv.getContext('2d').drawImage(img,0,0,w,h);
+    done({type:'img',data:cv.toDataURL('image/jpeg',0.6)});
+  }; img.onerror=function(){ showToast('⚠ Could not read image'); }; img.src=e.target.result; }; rd.readAsDataURL(f);
+}
+function viewAadhaar(id){
+  var doc=getStaffDocs()[id], s=getStaff().find(function(x){return x.id===id;});
+  if(!doc){ showToast('No Aadhaar uploaded'); return; }
+  var body=(doc.type==='pdf')?'<iframe src="'+doc.data+'" style="width:100%;height:68vh;border:none;border-radius:8px"></iframe>':'<img src="'+doc.data+'" style="max-width:100%;border-radius:8px" alt="Aadhaar"/>';
+  document.getElementById('detailContent').innerHTML=
+    '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px"><div class="modal-title">🪪 '+escHtml(s?s.name:'')+' — Aadhaar</div>'+
+    '<button onclick="closeModal()" style="background:var(--border);border:none;border-radius:8px;padding:6px 12px;cursor:pointer;font-size:13px">✕</button></div>'+body+
+    (canEdit()?'<div style="margin-top:10px"><button class="btn btn-outline btn-sm" style="width:auto;padding:8px 14px" onclick="uploadAadhaar(\''+id+'\')">Replace</button></div>':'');
+  document.getElementById('detailModal').classList.remove('hidden');
 }
 
 // ── Price-change log (Phase D) ────────────────────────────────────────────
@@ -2802,8 +2878,6 @@ function renderSettings(){
   var pinStat=document.getElementById('pinStatus');
   if(pinStat){ pinStat.className='alert '+(settings.pinHash?'alert-g':'alert-b'); pinStat.textContent=settings.pinHash?'✓ PIN lock is ON — required on each open':'PIN lock is OFF — set a PIN to enable'; }
   var idle=document.getElementById('s-idleLock'); if(idle) idle.value=settings.idleLockMin||0;
-  var salCard=document.getElementById('salariesCard'); if(salCard) salCard.style.display=(currentRole==='admin')?'':'none';
-  if(currentRole==='admin') renderSalaries();
   var plb=document.getElementById('priceLogBody'); if(plb) plb.innerHTML=priceLogHtml();
 }
 
@@ -3264,6 +3338,7 @@ var spSync = {
       // Cache the per-party fuel ledger store (cloud-authoritative) so a blind push doesn't wipe it.
       try{ if('partyFuel' in data && data.partyFuel){ localStorage.setItem(SK_PARTYFUEL, JSON.stringify(data.partyFuel)); } }catch(ex){}
       try{ if('staff' in data && data.staff){ localStorage.setItem(SK_STAFF, JSON.stringify(data.staff)); } }catch(ex){}
+      try{ if('staffDocs' in data && data.staffDocs){ localStorage.setItem(SK_STAFFDOCS, JSON.stringify(data.staffDocs)); } }catch(ex){}
       try{ if('lubes' in data && data.lubes){ localStorage.setItem(SK_LUBES, JSON.stringify(data.lubes)); } }catch(ex){}
       try{ if('lubeSales' in data && data.lubeSales){ localStorage.setItem(SK_LUBESALES, JSON.stringify(data.lubeSales)); } }catch(ex){}
       try{ if('priceLog' in data && data.priceLog){ localStorage.setItem(SK_PRICELOG, JSON.stringify(data.priceLog)); } }catch(ex){}
@@ -3380,6 +3455,7 @@ var spSync = {
         reconTakeover: (getReconStore().takeover)||null,
         partyFuel: getPartyFuelStore(),
         staff: getStaff(),
+        staffDocs: getStaffDocs(),
         lubes: getLubes(),
         lubeSales: getLubeSales(),
         priceLog: getPriceLog(),
@@ -3452,6 +3528,7 @@ var PERMS=[
   {k:'reports',    i:'📊', n:'Reports',               d:'Monthly summary & DSR',             tab:2},
   {k:'parties',    i:'🤝', n:'Parties',               d:'View credit-party ledgers',         tab:3},
   {k:'lubricants', i:'🛢️', n:'Lubricants',            d:'Lubricant/AdBlue sales & stock',    tab:6},
+  {k:'salaries',   i:'💼', n:'Salaries',              d:'Staff payroll ledger',              tab:7},
   {k:'fuelPrices', i:'💰', n:'Fuel Prices',           d:'View & update prices'},
   {k:'viewProfit', i:'📈', n:'View Profit',           d:'See margin & P&L data'},
   {k:'editEntries',i:'✏️', n:'Edit / Delete Entries', d:'Change or remove submitted entries'},
@@ -3459,8 +3536,8 @@ var PERMS=[
   {k:'settings',   i:'⚙️', n:'Settings',              d:'Open the settings tab',             tab:5}
 ];
 var DEFAULT_PERMS={
-  admin:    {dashboard:1,dailyEntry:1,records:1,reports:1,parties:1,lubricants:1,fuelPrices:1,viewProfit:1,editEntries:1,reconcile:1,settings:1},
-  operator: {dashboard:1,dailyEntry:1,records:0,reports:0,parties:0,lubricants:1,fuelPrices:0,viewProfit:0,editEntries:0,reconcile:0,settings:0}
+  admin:    {dashboard:1,dailyEntry:1,records:1,reports:1,parties:1,lubricants:1,salaries:1,fuelPrices:1,viewProfit:1,editEntries:1,reconcile:1,settings:1},
+  operator: {dashboard:1,dailyEntry:1,records:0,reports:0,parties:0,lubricants:1,salaries:0,fuelPrices:0,viewProfit:0,editEntries:0,reconcile:0,settings:0}
 };
 function getRolePerms(){
   var rp=(settings&&settings.rolePerms)||{};
