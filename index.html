@@ -255,7 +255,7 @@ tr.hi-row td{background:rgba(255,220,2,.06)}
   <button class="sbn" onclick="nav(4)" id="sbn4" data-tab="4"><span class="sb-ic">🕐</span>History</button>
   <div class="sb-group">System</div>
   <button class="sbn" onclick="nav(5)" id="sbn5" data-tab="5"><span class="sb-ic">⚙️</span>Settings</button>
-  <div class="sb-foot">Operations ERP · v5.5</div>
+  <div class="sb-foot">Operations ERP · v5.6</div>
 </div>
 
 <div class="bnav">
@@ -465,6 +465,7 @@ function loadData(){
   try{ var s=localStorage.getItem(SS); if(s) settings=JSON.parse(s); }catch(e){}
   try{ var e=localStorage.getItem(SK); if(e) entries=JSON.parse(e); }catch(e){}
   dedupeEntriesByDate();
+  try{ dedupePayments(); }catch(e){}
 }
 // Collapse duplicate-date day records: keep the submitted one; if both/neither submitted, the latest savedAt.
 // Self-heals cross-device duplicates (a sync race can leave two rows for one date). Returns true if any were removed.
@@ -1896,7 +1897,7 @@ function renderBpclResult(d){
   box.innerHTML=summary+table+applyBtn+'<div id="applyPanel" style="margin-top:12px"></div><p style="font-size:12px;color:var(--text3);margin-top:10px">Read-only until you press Apply. Applying stores a dated reconciliation record + the BPCL closing balance and cross-checks invoices against ERP purchases — it does <b>not</b> change any party ledger.</p>';
 }
 
-/* BUILD:rpc-redesign-v47-dedupe-entries */
+/* BUILD:rpc-redesign-v48-dedupe-payments */
 // Parse a Union Bank of India "Statement of Account" PDF (deposit/withdrawal by balance movement)
 function parseBankLines(lines){
   var out={period:'', opening:null, closing:null, rows:[],
@@ -3043,6 +3044,21 @@ function getPayments(){
   return [];
 }
 function savePayments(p){ try{ localStorage.setItem(SK_PAYMENTS,JSON.stringify(p)); }catch(e){} if(typeof spSync!=='undefined'&&spSync.active) spSync.schedulePush(); }
+// Collapse exact-duplicate payment rows (same party|date|amount|note). A device can end up
+// holding two identical copies of a payment/infusion row (a double tap, or a sync merge that
+// keeps both file-matched copies) — the cloud has one, the device shows two. Keyed on all four
+// fields so genuinely distinct payments (differ in date/amount/note) are never merged. Writes
+// localStorage directly (not savePayments) so it never triggers a push from inside pull.
+function dedupePayments(){
+  var lp=getPayments(); var n=lp.length;
+  var seen={}, out=[];
+  lp.forEach(function(p){
+    var k=(p&&p.party)+'|'+(p&&p.date)+'|'+(p&&p.amount)+'|'+(p&&p.note||'');
+    if(seen[k]) return; seen[k]=1; out.push(p);
+  });
+  if(out.length!==n){ try{ localStorage.setItem(SK_PAYMENTS, JSON.stringify(out)); }catch(e){} return true; }
+  return false;
+}
 
 // ── Reconciliation apply-store: dated statement records + tracked BPCL balance ──
 // Kept out of party ledgers so it never affects getPartyBalance / the nightly check.
@@ -3513,6 +3529,7 @@ var spSync = {
         kept.forEach(function(p){ seen[pkey(p)]=1; });
         (data.payments||[]).forEach(function(p){ if(!seen[pkey(p)]){ kept.push(p); seen[pkey(p)]=1; } });
         localStorage.setItem(SK_PAYMENTS,JSON.stringify(kept));
+        try{ dedupePayments(); }catch(ex){}  // collapse any exact-duplicate payment rows after merge
       }catch(ex){} }
       if(data.users && data.users.length){ try{ localStorage.setItem(SK_USERS,JSON.stringify(data.users)); }catch(ex){} }
 
@@ -3533,6 +3550,7 @@ var spSync = {
     if(!this.active) return false;
     if(!currentUser) return false;
     try{ dedupeEntriesByDate(); }catch(e){}  // never write duplicate-date rows to the cloud
+    try{ dedupePayments(); }catch(e){}  // never write duplicate payment rows to the cloud
     try{
       var tok=await getGraphToken(); if(!tok){ this.updateStatus('⚠ auth'); this.pendingPush=true; return false; }
       var sid=await this.getSiteId(); if(!sid){ this.updateStatus('⚠ site'); this.pendingPush=true; return false; }
