@@ -255,7 +255,7 @@ tr.hi-row td{background:rgba(255,220,2,.06)}
   <button class="sbn" onclick="nav(4)" id="sbn4" data-tab="4"><span class="sb-ic">🕐</span>History</button>
   <div class="sb-group">System</div>
   <button class="sbn" onclick="nav(5)" id="sbn5" data-tab="5"><span class="sb-ic">⚙️</span>Settings</button>
-  <div class="sb-foot">Operations ERP · v5.4</div>
+  <div class="sb-foot">Operations ERP · v5.5</div>
 </div>
 
 <div class="bnav">
@@ -407,7 +407,7 @@ tr.hi-row td{background:rgba(255,220,2,.06)}
     <div class="vrow"><span class="vl">Signed in as</span><span class="vv info" id="s-loggedIn">—</span></div>
     <div class="vrow"><span class="vl">Total entries</span><span class="vv info" id="s-count">—</span></div>
     <div class="vrow"><span class="vl">Last entry</span><span class="vv" id="s-last">—</span></div>
-    <div class="vrow"><span class="vl">Version</span><span class="vv muted">5.4 · Oct 2026</span></div>
+    <div class="vrow"><span class="vl">Version</span><span class="vv muted">5.5 · Oct 2026</span></div>
   </div>
   <div class="card" id="priceLogCard">
     <div class="card-title">🏷️ Price change history</div>
@@ -464,6 +464,21 @@ var entries = []; // array of day records, sorted by date
 function loadData(){
   try{ var s=localStorage.getItem(SS); if(s) settings=JSON.parse(s); }catch(e){}
   try{ var e=localStorage.getItem(SK); if(e) entries=JSON.parse(e); }catch(e){}
+  dedupeEntriesByDate();
+}
+// Collapse duplicate-date day records: keep the submitted one; if both/neither submitted, the latest savedAt.
+// Self-heals cross-device duplicates (a sync race can leave two rows for one date). Returns true if any were removed.
+function dedupeEntriesByDate(){
+  var by={}, n=(entries||[]).length;
+  (entries||[]).forEach(function(e){
+    var d=e&&e.date; if(!d) return; var cur=by[d];
+    if(!cur){ by[d]=e; return; }
+    if(!!e.submitted !== !!cur.submitted) by[d]= e.submitted ? e : cur;       // prefer submitted
+    else by[d]= ((e.savedAt||'') >= (cur.savedAt||'')) ? e : cur;             // else latest savedAt
+  });
+  var out=Object.keys(by).sort().map(function(d){ return by[d]; });
+  if(out.length!==n){ entries=out; try{ localStorage.setItem(SK, JSON.stringify(entries)); }catch(e){} return true; }
+  return false;
 }
 function saveEntries(){
   try{ localStorage.setItem(SK,JSON.stringify(entries)); }catch(e){ alert('Storage full. Export backup first.'); }
@@ -1881,7 +1896,7 @@ function renderBpclResult(d){
   box.innerHTML=summary+table+applyBtn+'<div id="applyPanel" style="margin-top:12px"></div><p style="font-size:12px;color:var(--text3);margin-top:10px">Read-only until you press Apply. Applying stores a dated reconciliation record + the BPCL closing balance and cross-checks invoices against ERP purchases — it does <b>not</b> change any party ledger.</p>';
 }
 
-/* BUILD:rpc-redesign-v46-operatorbackdate */
+/* BUILD:rpc-redesign-v47-dedupe-entries */
 // Parse a Union Bank of India "Statement of Account" PDF (deposit/withdrawal by balance movement)
 function parseBankLines(lines){
   var out={period:'', opening:null, closing:null, rows:[],
@@ -3469,6 +3484,7 @@ var spSync = {
           try{ localStorage.setItem(SK, JSON.stringify(entries)); }catch(ex){}
         }
       }
+      try{ if(dedupeEntriesByDate()) changed=true; }catch(ex){}  // collapse any duplicate-date rows after merge
       if(data.settings)  { Object.assign(settings, data.settings); try{ localStorage.setItem(SS,JSON.stringify(settings)); }catch(ex){} }
       if(data.parties && data.parties.length){ try{
         var lp=getParties();
@@ -3516,6 +3532,7 @@ var spSync = {
   push: async function(){
     if(!this.active) return false;
     if(!currentUser) return false;
+    try{ dedupeEntriesByDate(); }catch(e){}  // never write duplicate-date rows to the cloud
     try{
       var tok=await getGraphToken(); if(!tok){ this.updateStatus('⚠ auth'); this.pendingPush=true; return false; }
       var sid=await this.getSiteId(); if(!sid){ this.updateStatus('⚠ site'); this.pendingPush=true; return false; }
