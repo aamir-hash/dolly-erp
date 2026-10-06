@@ -255,7 +255,7 @@ tr.hi-row td{background:rgba(255,220,2,.06)}
   <button class="sbn" onclick="nav(4)" id="sbn4" data-tab="4"><span class="sb-ic">🕐</span>History</button>
   <div class="sb-group">System</div>
   <button class="sbn" onclick="nav(5)" id="sbn5" data-tab="5"><span class="sb-ic">⚙️</span>Settings</button>
-  <div class="sb-foot">Operations ERP · v5.3</div>
+  <div class="sb-foot">Operations ERP · v5.4</div>
 </div>
 
 <div class="bnav">
@@ -407,7 +407,7 @@ tr.hi-row td{background:rgba(255,220,2,.06)}
     <div class="vrow"><span class="vl">Signed in as</span><span class="vv info" id="s-loggedIn">—</span></div>
     <div class="vrow"><span class="vl">Total entries</span><span class="vv info" id="s-count">—</span></div>
     <div class="vrow"><span class="vl">Last entry</span><span class="vv" id="s-last">—</span></div>
-    <div class="vrow"><span class="vl">Version</span><span class="vv muted">5.3 · Sep 2026</span></div>
+    <div class="vrow"><span class="vl">Version</span><span class="vv muted">5.4 · Oct 2026</span></div>
   </div>
   <div class="card" id="priceLogCard">
     <div class="card-title">🏷️ Price change history</div>
@@ -798,19 +798,21 @@ function healthCheck(){
   return {status:status,summary:summary,checks:checks};
 }
 
+// A user can enter earlier-FY dates if they're an admin OR have the "backdate" permission granted to their role.
+function canBackdate(){ return (typeof isAdmin==='function'&&isAdmin()) || (typeof hasPerm==='function'&&hasPerm('backdate')); }
 function entryDateBounds(){
   var today=todayStr();
-  // Operators: only the current running month. Admins: full FY 2026-27 (for corrections). No future dates for anyone.
-  var min=(typeof isAdmin==='function'&&isAdmin()) ? '2026-04-01' : today.slice(0,7)+'-01';
+  // Current running month only, unless the user can back-date (admin or 'backdate' permission) → full FY 2026-27. No future dates for anyone.
+  var min=canBackdate() ? '2026-04-01' : today.slice(0,7)+'-01';
   return {min:min, max:today};
 }
 function validateEntryDate(d){
-  var b=entryDateBounds(), adm=(typeof isAdmin==='function'&&isAdmin());
+  var b=entryDateBounds(), full=canBackdate();
   if(!d) return {ok:false,msg:'Date is required.'};
   var dt=parseLocal(d);
   if(isNaN(dt.getTime())||localISO(dt)!==d) return {ok:false,msg:'Enter a valid calendar date.'};
   if(d>b.max) return {ok:false,msg:'Future dates are not allowed.'};
-  if(d<b.min) return {ok:false,msg:adm?'Date is outside FY 2026-27 (starts 01-Apr-2026).':'You can only enter dates in the current month. Ask an admin for earlier corrections.'};
+  if(d<b.min) return {ok:false,msg:full?'Date is outside FY 2026-27 (starts 01-Apr-2026).':'You can only enter dates in the current month. Ask an admin to turn on "Back-date entries" for you.'};
   return {ok:true};
 }
 function stepDate(){
@@ -1879,7 +1881,7 @@ function renderBpclResult(d){
   box.innerHTML=summary+table+applyBtn+'<div id="applyPanel" style="margin-top:12px"></div><p style="font-size:12px;color:var(--text3);margin-top:10px">Read-only until you press Apply. Applying stores a dated reconciliation record + the BPCL closing balance and cross-checks invoices against ERP purchases — it does <b>not</b> change any party ledger.</p>';
 }
 
-/* BUILD:rpc-redesign-v45-aiplugin */
+/* BUILD:rpc-redesign-v46-operatorbackdate */
 // Parse a Union Bank of India "Statement of Account" PDF (deposit/withdrawal by balance movement)
 function parseBankLines(lines){
   var out={period:'', opening:null, closing:null, rows:[],
@@ -3630,12 +3632,13 @@ var PERMS=[
   {k:'fuelPrices', i:'💰', n:'Fuel Prices',           d:'View & update prices'},
   {k:'viewProfit', i:'📈', n:'View Profit',           d:'See margin & P&L data'},
   {k:'editEntries',i:'✏️', n:'Edit / Delete Entries', d:'Change or remove submitted entries'},
+  {k:'backdate',   i:'📅', n:'Back-date entries',      d:'Enter earlier-FY dates (not just this month) — e.g. to catch up a past month'},
   {k:'reconcile',  i:'🏦', n:'Reconcile',             d:'Upload & match bank / BPCL statements'},
   {k:'settings',   i:'⚙️', n:'Settings',              d:'Open the settings tab',             tab:5}
 ];
 var DEFAULT_PERMS={
-  admin:    {dashboard:1,dailyEntry:1,records:1,reports:1,parties:1,lubricants:1,salaries:1,fuelPrices:1,viewProfit:1,editEntries:1,reconcile:1,settings:1},
-  operator: {dashboard:1,dailyEntry:1,records:0,reports:0,parties:0,lubricants:1,salaries:0,fuelPrices:0,viewProfit:0,editEntries:0,reconcile:0,settings:0}
+  admin:    {dashboard:1,dailyEntry:1,records:1,reports:1,parties:1,lubricants:1,salaries:1,fuelPrices:1,viewProfit:1,editEntries:1,backdate:1,reconcile:1,settings:1},
+  operator: {dashboard:1,dailyEntry:1,records:0,reports:0,parties:0,lubricants:1,salaries:0,fuelPrices:0,viewProfit:0,editEntries:0,backdate:0,reconcile:0,settings:0}
 };
 function getRolePerms(){
   var rp=(settings&&settings.rolePerms)||{};
